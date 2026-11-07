@@ -39,6 +39,7 @@
 15. [Etapa 3: `bioativos`](#15-etapa-3-bioativos)
 16. [Etapa 4: `chembl`](#16-etapa-4-chembl)
 17. [Etapa 5: `pubmed`](#17-etapa-5-pubmed)
+17-A. [Etapas 6 a 8: `normalizacao`, `banco` e `qualidade` (banco relacional)](#17a-etapas-6-a-8-normalizacao-banco-e-qualidade)
 
 **Parte V: Resultados**
 
@@ -437,7 +438,7 @@ opcionais.
 [regiao]          ← onde procurar                (obrigatória)
 [taxons]          ← sua lista de plantas         (ou lista_de_plantas.txt)
 [termos_pubmed]   ← atividades de interesse      (opcional)
-[artigos] [taxonomia] [ollama] [pubmed] [bioativos] [chembl]  ← parâmetros
+[artigos] [taxonomia] [ollama] [pubmed] [bioativos] [chembl] [banco]  ← parâmetros
 ```
 
 **Regras gerais**
@@ -609,6 +610,19 @@ aparece.
 | `prever_por_similaridade` | `false` | para compostos sem dados, mostra atividades de moléculas parecidas (**hipótese**, não evidência; lento) |
 | `similaridade_minima` | `85` | similaridade mínima, em % (70 a 100) |
 | `estruturas_url` | vazio | endereço alternativo do arquivo de estruturas |
+
+**`[banco]`: banco relacional (etapas 6 a 8)**
+
+| Chave | Padrão | Função |
+|---|---|---|
+| `pubchem` | `true` | normaliza os identificadores pelo PubChem (CID, InChI, SMILES, propriedades, sinônimos). `false` usa só o que já estiver em cache |
+| `max_sinonimos` | `25` | sinônimos por composto em `sinonimos.csv` (0 = nenhum do PubChem) |
+| `classyfire` | `faltantes` | `faltantes` = consulta a API do ClassyFire só para os compostos sem classe no COCONUT; `todos` = consulta todos (e registra divergências); `nao` = só o COCONUT |
+| `classyfire_submeter` | `false` | envia ao ClassyFire as estruturas que ele ainda não classificou e aguarda (lento) |
+| `vias_pubchem` | `true` | busca vias metabólicas/de sinalização no PubChem (`vias_metabolicas.csv`) |
+| `espectros_pubchem` | `true` | busca dados espectrais no PubChem (`dados_espectrais.csv`) |
+| `admet_ai` | `false` | acrescenta previsões do pacote `admet-ai` (rede neural; pesado) às colunas `admetai_*` de `perfil_admet.csv` |
+| `incluir_pubmed` | `true` | inclui os relatos do PubMed (etapa 5) em `bioatividade.csv` |
 
 **`[pubmed]`: busca de atividades (etapa 5)**
 
@@ -1635,6 +1649,98 @@ próxima rodada.
 
 ---
 
+## 17-A. Etapas 6 a 8: `normalizacao`, `banco` e `qualidade`
+
+Estas três etapas rodam depois do `pubmed` e montam o **banco relacional** do
+projeto. Elas não dependem de nenhuma outra, além das saídas das etapas
+anteriores, e o `--retomar` pula cada uma se sua saída já existe.
+
+### 17-A.1 Etapa 6: `normalizacao` → `compostos_normalizados.csv`
+
+`mods/normalizar_compostos.py`. Cobre **OE1** (normalizar identificadores pelo
+PubChem, classificar pelo ClassyFire) e **OE2** (deduplicar por InChIKey
+canônico, preservando toda a rastreabilidade e registrando conflitos).
+
+**Entrada**: `ocorrencias_compostos_bruto.csv` (etapa `bioativos`) — um registro
+por base × planta. Se faltar (rodada da v3.16 ou anterior), usa
+`especies_com_compostos_bioativos.csv`, com rastreabilidade reduzida.
+
+**Como escolhe o InChIKey canônico de cada ocorrência**:
+1. o InChIKey **declarado** pela base, se existe no PubChem;
+2. senão, o InChIKey **calculado** (RDKit) do SMILES da própria base, se existe no PubChem;
+3. senão, o declarado; 4. senão, o calculado. Sem nenhum, a ocorrência fica
+   sem estrutura (entra na rastreabilidade, fora da tabela de compostos).
+
+**Conflitos detectados** (em `normalizacao_conflitos.csv`, com severidade e a
+resolução adotada): InChIKey declarado ≠ do SMILES da base; SMILES inválido;
+estrutura/fórmula/CID divergentes entre bases; classe ClassyFire do COCONUT ≠
+da API; mesmo id ou mesmo nome apontando para estruturas diferentes; variantes
+de estereoquímica; sais e formas carregadas.
+
+**Saídas**: `compostos_normalizados.csv` (um composto por InChIKey),
+`normalizacao_ocorrencias.csv` (rastreabilidade), `normalizacao_sinonimos.csv`,
+`normalizacao_conflitos.csv`, `normalizacao_mapa_inchikey.csv` (de-para dos
+InChIKeys de origem para o canônico).
+
+### 17-A.2 Etapa 7: `banco` → pasta `banco/`
+
+`mods/gerar_banco.py`. Cobre **OE3** (CSVs relacionais com esquema e dicionário
+públicos) e **OE5** (drogabilidade e ADMET básico de todo composto com SMILES).
+
+Monta **12 tabelas CSV** (UTF-8 com BOM) interligadas pelo **InChIKey
+canônico** (`compostos.inchikey`); os organismos se ligam pelo
+`nome_cientifico`:
+
+| Tabela | Conteúdo |
+|---|---|
+| `compostos.csv` | identidade química: um composto por InChIKey, com identificadores do PubChem, ClassyFire, NPClassifier e contagens |
+| `fontes.csv` | rastreabilidade: cada registro de cada base (o que *aquela* base informa) |
+| `sinonimos.csv` | sinônimos e nomes (PubChem e bases) |
+| `organismos.csv` | organismos produtores: taxonomia e distribuição |
+| `origem_biologica.csv` | composto × organismo |
+| `distribuicao_geografica.csv` | composto × organismo × UF |
+| `bioatividade.csv` | medidas quantitativas (ChEMBL, NPASS) e relatos qualitativos (PubMed) |
+| `vias_metabolicas.csv` | vias do PubChem e via biossintética do NPClassifier |
+| `dados_espectrais.csv` | espectros compilados no PubChem e m/z teóricos dos adutos (RDKit) |
+| `perfil_admet.csv` | drogabilidade e ADMET básico (RDKit): Lipinski, Veber, Ghose, Egan, Muegge, QED, TPSA, BOILED-Egg, alertas PAINS/Brenk |
+| `conflitos.csv` | conflitos da etapa `normalizacao` |
+| `mapa_inchikey.csv` | de-para dos InChIKeys de origem |
+
+Mais `dicionario_dados.csv`, `ESQUEMA.md` (com diagrama ER), `datapackage.json`
+(Frictionless Data: chaves primárias e estrangeiras) e `LEIA-ME.txt`.
+
+**FAIR.** O banco segue os princípios FAIR:
+
+- **Findable** — InChIKey como identificador canônico universal; `datapackage.json`
+  com `title`, `description`, `keywords`, `version`, `created` e `id`;
+  `dicionario_dados.csv` e `ESQUEMA.md`.
+- **Accessible** — formato aberto (CSV UTF-8), sem ferramenta proprietária;
+  `url_registro` resolve cada ocorrência à sua base.
+- **Interoperable** — identificadores externos padronizados (PubChem CID, ChEMBL,
+  ClassyFire, NPClassifier) e esquema Frictionless com chaves estrangeiras.
+- **Reusable** — proveniência por registro (`fontes.csv`, `metodo_identificacao`),
+  conflitos registrados, e `PROVENIENCIA_E_LICENCAS.md` com a licença do banco
+  (**CC-BY-SA-4.0**, compatível com a fonte mais restritiva, o ChEMBL) e os termos
+  de cada base de origem. Confirme os termos vigentes de cada fonte na data da coleta.
+
+> O perfil ADMET é calculado por **regras físico-químicas** (RDKit): são
+> estimativas para triagem, não medidas. Com `admet_ai = true` no `[banco]` e o
+> pacote `admet-ai` instalado, colunas previstas por rede neural são
+> acrescentadas com o prefixo `admetai_`.
+
+### 17-A.3 Etapa 8: `qualidade` → pasta `banco/qualidade/`
+
+`mods/analisar_qualidade.py`. Cobre **OE4**. Lê a pasta `banco/` (sem rede) e
+gera `RELATORIO_QUALIDADE.md` mais planilhas: `completude_por_base.csv`
+(completude dos campos por base de origem), `espaco_quimico_*.csv` (distribuição
+por ClassyFire e NPClassifier), `taxonomia_*.csv` (cobertura por família, ordem,
+classe, reino), `sobreposicao_bases.csv` e `sobreposicao_jaccard.csv` (exclusivos
+e compartilhados entre bases) e `vieses_curadoria.csv` (concentração por
+base/família/classe e lacunas sistemáticas de estrutura, bioatividade e
+distribuição).
+
+---
+
 # Parte V: Resultados
 
 ## 18. Qual arquivo abrir e como ler
@@ -2094,7 +2200,37 @@ Ao publicar resultados:
 
 ## 26. Histórico de mudanças
 
-### Versão 3.16 (atual): Qwen como modelo padrão
+### Versão 3.17 (atual): banco relacional, InChIKey canônico, ADMET e qualidade
+
+Três etapas novas depois do `pubmed`, que transformam os CSVs "largos" das
+etapas anteriores num **banco relacional** normalizado e documentado, cobrindo
+os cinco objetivos específicos do projeto:
+
+| Etapa | Script | O que faz | Objetivo |
+|---|---|---|---|
+| 6 `normalizacao` | `normalizar_compostos.py` | normaliza os identificadores pelo **PubChem** e classifica a estrutura pelo **ClassyFire**; deduplica tudo por **InChIKey canônico**, preservando a rastreabilidade de cada ocorrência e **detectando e registrando conflitos** entre bases | OE1, OE2 |
+| 7 `banco` | `gerar_banco.py` | monta **12 CSVs relacionais interligados por InChIKey** (identidade química, fontes, sinônimos, origem biológica, distribuição, bioatividade, vias, espectros, ADMET, conflitos), com **dicionário de dados**, `ESQUEMA.md` e `datapackage.json`; calcula **drogabilidade e ADMET básico** (RDKit) de todo composto com SMILES | OE3, OE5 |
+| 8 `qualidade` | `analisar_qualidade.py` | analisa **completude por base, espaço químico (ClassyFire), cobertura taxonômica, sobreposição entre bases (Jaccard) e vieses de curadoria** | OE4 |
+
+Outras mudanças:
+
+| Antes | Agora |
+|---|---|
+| A etapa `bioativos` só gravava `especies_com_compostos_bioativos.csv` | grava também `ocorrencias_compostos_bruto.csv`: **um registro por base × planta**, antes da consolidação, com o que *aquela* base informa (é a entrada da rastreabilidade da etapa `normalizacao`) |
+| RDKit era opcional só para conferir SMILES | continua opcional, mas agora é **recomendado**: sem ele não há recálculo de InChIKey, perfil ADMET nem detecção de conflitos de estrutura (o pipeline avisa e segue) |
+| `input.txt` sem seção `[banco]` | nova seção **`[banco]`** controla PubChem, ClassyFire, vias, espectros e ADMET-AI (seção 7.4) |
+
+> O banco fica na pasta **`banco/`** e segue o padrão *Frictionless Data*
+> (`datapackage.json` com chaves primárias e estrangeiras). Valide com
+> `pip install frictionless && frictionless validate banco/datapackage.json`.
+
+O banco é **FAIR**: InChIKey como identificador canônico, metadados de descoberta
+e esquema legível por máquina no `datapackage.json`, identificadores externos
+padronizados, proveniência por registro em `fontes.csv` e, em
+`PROVENIENCIA_E_LICENCAS.md`, a licença do banco (**CC-BY-SA-4.0**) e os termos de
+cada base de origem.
+
+### Versão 3.16: Qwen como modelo padrão
 
 | Antes | Agora |
 |---|---|
