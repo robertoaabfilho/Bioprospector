@@ -11,3 +11,5 @@ _para_apagar/
 __pycache__/
 *.pyc
 mods/.python_painel
+# Lançador gerado neste computador (mods/painel.sh atalho)
+Painel do pipeline (Linux)
