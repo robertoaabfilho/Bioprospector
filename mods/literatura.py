@@ -183,6 +183,16 @@ class Disjuntor:
         return False
 
 
+def _idlist(resposta: dict) -> list:
+    """PMIDs de uma resposta do esearch. O NCBI às vezes responde 200 com o erro
+    dentro do JSON (ex.: "Search Backend failed"): isso não é "nenhum artigo" -
+    vira exceção, para não ir para o cache como busca vazia."""
+    resultado = resposta["esearchresult"]
+    if "ERROR" in resultado or "idlist" not in resultado:
+        raise ValueError(str(resultado.get("ERROR", "resposta sem idlist"))[:200])
+    return resultado["idlist"]
+
+
 def esearch(sessao, query: str, retmax: int, ordenar: str = "relevance") -> list | None:
     """Busca simples (GET). Para listas longas de PMIDs use esearch_post."""
     try:
@@ -190,8 +200,8 @@ def esearch(sessao, query: str, retmax: int, ordenar: str = "relevance") -> list
             **params_ncbi(), "db": "pubmed", "term": query, "retmode": "json",
             "retmax": retmax, "sort": ordenar})
         r.raise_for_status()
-        return r.json()["esearchresult"].get("idlist", [])
-    except (requests.RequestException, ValueError, KeyError) as e:
+        return _idlist(r.json())
+    except (requests.RequestException, ValueError, KeyError, TypeError) as e:
         print(f"  ! esearch falhou ({sem_chave(e)}) - será tentado na próxima execução")
         return None
     finally:
@@ -206,8 +216,8 @@ def esearch_post(sessao, query: str, retmax: int) -> list | None:
             **params_ncbi(), "db": "pubmed", "term": query, "retmode": "json",
             "retmax": retmax})
         r.raise_for_status()
-        return r.json()["esearchresult"].get("idlist", [])
-    except (requests.RequestException, ValueError, KeyError) as e:
+        return _idlist(r.json())
+    except (requests.RequestException, ValueError, KeyError, TypeError) as e:
         print(f"  ! esearch (POST) falhou ({sem_chave(e)}) - será tentado na próxima execução")
         return None
     finally:

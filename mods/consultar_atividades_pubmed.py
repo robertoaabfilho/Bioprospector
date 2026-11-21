@@ -324,7 +324,7 @@ def cids_em_lote(sessao, inchikeys: list) -> dict | None:
             **params_ncbi(), "db": "pccompound", "term": termo,
             "retmode": "json", "retmax": len(inchikeys) * 3})
         r.raise_for_status()
-        cids = r.json()["esearchresult"].get("idlist", [])
+        cids = literatura._idlist(r.json())   # erro dentro do JSON = falha, não "nenhum CID"
         time.sleep(PAUSA_NCBI)
         if not cids:
             return {}
@@ -519,35 +519,11 @@ def preparar_compostos(df: pd.DataFrame, sessao) -> pd.DataFrame:
 # =============================================================================
 # 2-3. Via InChIKey: artigos vinculados no PubChem, filtrados por atividade
 # =============================================================================
-RESPOSTA_CORTADA = "cortada"   # elink_lote: resposta grande demais, interrompida no meio
+RESPOSTA_CORTADA = "cortada"   # elink_lote: resposta grande demais (cortada ou recusada)
+VERSAO_VINCULOS = 2            # v3.24: entradas sem "v" e com 0 artigos são conferidas de novo
 
 
-def elink_lote(sessao, cids: list, avisar: bool = True) -> dict | str | None:
-    """{cid: [pmids]} para um lote de CIDs (todos os vínculos PubChem->PubMed:
-    MeSH, depositantes e editoras). None se o servidor falhou; RESPOSTA_CORTADA
-    se a resposta veio interrompida ou incompleta (lotes com substâncias muito
-    citadas, como o ácido acético, com ~40 mil artigos, passam do que o NCBI
-    entrega de uma vez): aí quem chama divide o lote."""
-    dados = [(k, v) for k, v in params_ncbi().items()]
-    dados += [("dbfrom", "pccompound"), ("db", "pubmed"), ("retmode", "json")]
-    dados += [("id", c) for c in cids]
-    try:
-        r = sessao.post(EUTILS + "elink.fcgi", data=dados, timeout=120)
-        r.raise_for_status()
-        conjuntos = r.json().get("linksets", [])
-    except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ContentDecodingError,
-            ValueError) as e:
-        if len(cids) > 1:
-            return RESPOSTA_CORTADA
-        if avisar:
-            print(f"  ! elink falhou para o CID {cids[0]} ({sem_chave(e)}) - será tentado na próxima execução")
-        return None
-    except requests.RequestException as e:
-        if avisar:
-            print(f"  ! elink falhou ({sem_chave(e)}) - será tentado na próxima execução")
-        return None
-    finally:
-        time.sleep(PAUSA_NCBI)
+def _links_json(conjuntos: list, cids: list) -> dict:
     resultado = {str(c): set() for c in cids}
     for ls in conjuntos:
         ids = [str(i) for i in ls.get("ids", [])]
@@ -558,11 +534,81 @@ def elink_lote(sessao, cids: list, avisar: bool = True) -> dict | str | None:
     return {c: sorted(p) for c, p in resultado.items()}
 
 
+def _elink_xml(sessao, cid: str) -> dict | None:
+    """Um CID só, em XML (sem o limite de 10 MB da conversão para JSON do NCBI)."""
+    import xml.etree.ElementTree as ET
+    dados = [(k, v) for k, v in params_ncbi().items()]
+    dados += [("dbfrom", "pccompound"), ("db", "pubmed"), ("retmode", "xml"), ("id", cid)]
+    try:
+        r = sessao.post(EUTILS + "elink.fcgi", data=dados, timeout=300)
+        r.raise_for_status()
+        raiz = ET.fromstring(r.content)
+    except (requests.RequestException, ET.ParseError) as e:
+        print(f"  ! elink (XML) falhou para o CID {cid} ({sem_chave(e)}) - será tentado na próxima execução")
+        return None
+    finally:
+        time.sleep(PAUSA_NCBI)
+    if raiz.find(".//LinkSet") is None or raiz.find(".//ERROR") is not None:
+        print(f"  ! elink (XML) sem resultado para o CID {cid} - será tentado na próxima execução")
+        return None
+    pmids = {i.text for db in raiz.iter("LinkSetDb") if db.findtext("DbTo") == "pubmed"
+             for i in db.iterfind("Link/Id") if i.text}
+    return {cid: sorted(pmids)}
+
+
+def elink_lote(sessao, cids: list, avisar: bool = True) -> dict | str | None:
+    """{cid: [pmids]} para um lote de CIDs (todos os vínculos PubChem->PubMed:
+    MeSH, depositantes e editoras). None se o servidor falhou (fica para a
+    próxima execução); RESPOSTA_CORTADA se a resposta é grande demais - ou vem
+    cortada no meio, ou o NCBI responde 200 com "cannot be transformed to JSON,
+    the max size is 10MB" (lotes com substâncias muito citadas, como o ácido
+    acético, com ~40 mil artigos): aí quem chama divide o lote. Uma resposta
+    sem "linksets" nunca é tratada como "0 artigos"."""
+    dados = [(k, v) for k, v in params_ncbi().items()]
+    dados += [("dbfrom", "pccompound"), ("db", "pubmed"), ("retmode", "json")]
+    dados += [("id", c) for c in cids]
+    try:
+        r = sessao.post(EUTILS + "elink.fcgi", data=dados, timeout=120)
+        r.raise_for_status()
+        j = r.json()
+    except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ContentDecodingError,
+            ValueError):
+        if len(cids) > 1:
+            return RESPOSTA_CORTADA
+        return _elink_xml(sessao, cids[0])
+    except requests.RequestException as e:
+        # 502/503/504 e tempo esgotado num lote costumam ser resposta grande demais
+        # para o gateway do NCBI: dividir resolve (um CID sozinho é falha de verdade)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        if len(cids) > 1 and (status in (502, 503, 504) or isinstance(e, requests.exceptions.Timeout)):
+            return RESPOSTA_CORTADA
+        if avisar:
+            print(f"  ! elink falhou ({sem_chave(e)}) - será tentado na próxima execução")
+        return None
+    finally:
+        time.sleep(PAUSA_NCBI)
+    if not isinstance(j, dict) or "linksets" not in j:
+        erro = str((j.get("eutilsresult") or {}).get("ERROR") or j.get("ERROR") or "")
+        if "size" in erro.lower() or "max" in erro.lower():
+            return RESPOSTA_CORTADA if len(cids) > 1 else _elink_xml(sessao, cids[0])
+        if avisar:
+            print(f"  ! elink sem resultado ({erro[:150] or 'resposta sem linksets'}) - "
+                  "será tentado na próxima execução")
+        return None
+    return _links_json(j["linksets"], cids)
+
+
 def vinculos_pubchem(sessao, cids: list) -> dict:
     cache = carregar_cache(CACHE_VINCULOS, "cid")
-    pendentes = [c for c in cids if c not in cache] if not PARCIAL else []
+    # até a v3.23, uma resposta de erro do NCBI (lote grande demais) era gravada
+    # como "0 artigos": as entradas antigas vazias são conferidas de novo, uma vez
+    suspeitos = {c for c in cids if c in cache and not cache[c].get("pmids")
+                 and cache[c].get("v", 1) < VERSAO_VINCULOS}
+    pendentes = [c for c in cids if c not in cache or c in suspeitos] if not PARCIAL else []
     print(f"PubChem -> PubMed: {len(pendentes)} CID(s) a consultar "
-          f"({len(cids) - len(pendentes)} em cache)")
+          f"({len(cids) - len(pendentes)} em cache"
+          + (f"; {len(suspeitos)} gravados com 0 artigos por versões anteriores são conferidos de novo"
+             if suspeitos and not PARCIAL else "") + ")")
     lotes = [pendentes[i:i + LOTE_ELINK] for i in range(0, len(pendentes), LOTE_ELINK)]
     disjuntor = Disjuntor("PubChem vínculos")
     divididos = 0
@@ -583,7 +629,7 @@ def vinculos_pubchem(sessao, cids: list) -> dict:
                 continue
             disjuntor.sucesso()
             for cid in parte:
-                cache[cid] = {"cid": cid, "pmids": res.get(cid, [])}
+                cache[cid] = {"cid": cid, "pmids": res.get(cid, []), "v": VERSAO_VINCULOS}
                 gravar_cache(CACHE_VINCULOS, cache[cid])
         if parar:
             break

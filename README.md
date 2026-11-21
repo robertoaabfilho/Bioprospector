@@ -1,6 +1,6 @@
 # Pipeline de prospecção de plantas e compostos bioativos
 
-> **Versão 3.23** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
+> **Versão 3.24** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
 >
 > Você informa uma **região**, uma **lista de plantas** e as **atividades
 > biológicas** que interessam. O pipeline devolve planilhas com as plantas, os
@@ -2570,9 +2570,12 @@ interromper).
   naturais raros não têm nenhum (por isso existe a busca pelo nome). No
   outro extremo, substâncias muito comuns (ácido acético, glicose...) têm
   dezenas de milhares de artigos ligados; o pipeline consulta os vínculos
-  em lotes de 100 CIDs e, quando a resposta de um lote é grande demais e
-  vem cortada pelo NCBI, divide o lote ao meio até dar certo (o registro
-  mostra `N lote(s) com resposta grande demais ... foram divididos`).
+  em lotes de 100 CIDs e, quando a resposta de um lote é grande demais
+  (vem cortada, dá erro 502/504 ou o NCBI recusa com `cannot be transformed
+  to JSON, the max size is 10MB`), divide o lote ao meio até dar certo; um
+  CID sozinho grande demais é pedido em XML. O registro mostra `N lote(s)
+  com resposta grande demais ... foram divididos`. Uma resposta de erro
+  nunca é gravada como "0 artigos".
 - **Estereoisômeros e previsões** do ChEMBL são indicativos, não dados do
   próprio composto.
 - **As bases de compostos** registram o que foi publicado: a falta de
@@ -2910,6 +2913,18 @@ licença do agregado é limitada pela fonte mais restritiva.
 Para aplicar numa rodada em andamento ou concluída: `mods/rodar.sh --a-partir-de pubmed`
 (Windows: `mods\rodar.bat --a-partir-de pubmed`). Tudo o que já foi lido está no cache
 e não é lido de novo.
+
+### Versão 3.24: vínculos do PubChem sem falsos "0 artigos"
+
+| Antes | Agora |
+|---|---|
+| Quando a resposta de um lote passava de 10 MB, o NCBI respondia 200 com o erro `cannot be transformed to JSON, the max size is 10MB`, e o pipeline gravava **0 artigos** para os 100 CIDs do lote. Afetou sobretudo as substâncias mais citadas (ex.: benzaldeído, ~2.900 artigos, gravado com 0) | erro dentro da resposta divide o lote (como a resposta cortada); 502/503/504 e tempo esgotado num lote também; um CID sozinho grande demais é pedido em XML, sem o limite de 10 MB |
+| Os CIDs gravados com 0 artigos por versões anteriores ficavam assim para sempre | a etapa 5 confere de novo, uma vez, as entradas antigas vazias do `cache_pubchem_vinculos.jsonl` (as novas levam `"v": 2`); o registro mostra quantas |
+| Busca no PubMed (`esearch`, por GET e por POST: plantas e compostos pelo nome, filtro de atividade) que voltasse 200 com erro dentro do JSON (ex.: `Search Backend failed`) era gravada como "nenhum artigo"; na busca de CID por InChIKey, o lote inteiro ia para a consulta um a um | é tratada como falha e tentada na próxima execução |
+
+Conferência feita nas plantas: as buscas de plantas pelo nome não foram
+afetadas (200 buscas vazias refeitas: 199 continuam vazias, 1 ganhou um
+artigo publicado depois), nem o download de resumos.
 
 ### Versão 3.23: vínculos do PubChem completos e paralelo visível no painel
 
