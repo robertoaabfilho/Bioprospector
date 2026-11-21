@@ -1,0 +1,13 @@
+# Configuração pessoal (chaves e senhas): copie os .exemplo e preencha
+config/input.txt
+config/credenciais.txt
+config/lista_de_plantas.txt
+# Bases, caches e resultados (vários GB; gerados pelo pipeline)
+dados/
+cache/
+resultados/
+_para_apagar/
+# Python
+__pycache__/
+*.pyc
+mods/.python_painel

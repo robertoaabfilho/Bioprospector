@@ -1,0 +1,399 @@
+# =============================================================================
+# input.txt - Entrada do pipeline de prospecção de plantas e bioativos
+# =============================================================================
+# Linhas começadas com # são comentários e são ignoradas.
+# Use PONTO como separador decimal (ex.: -3.35) e VÍRGULA para separar
+# latitude de longitude (ex.: -3.35, -64.71).
+# =============================================================================
+
+[regiao]
+# A mesma região é usada de duas formas:
+#   - pelo GBIF (etapa "gbif"), que entende COORDENADAS;
+#   - pelo PubMed e pelo OpenAlex (descoberta de plantas em artigos, etapa
+#     "plantas"), que só entendem PALAVRAS no texto: termos_texto, abaixo.
+# Se mudar a região, ajuste os dois.
+#
+# Coordenadas: um ponto por linha, no formato  latitude, longitude
+#   1 ponto   -> círculo centrado no ponto, com o raio definido em raio_km
+#   2 pontos  -> retângulo (cantos opostos: sudoeste e nordeste, em qualquer ordem)
+#   3+ pontos -> polígono (vértices na ordem do contorno; não precisa repetir o 1º)
+#
+# Latitude negativa = hemisfério sul; longitude negativa = hemisfério oeste.
+# Exemplo abaixo: Tefé-AM e entorno das RDS Mamirauá e Amanã.
+-3.9, -66.2
+-1.9, -63.3
+
+# Só é usado quando há 1 único ponto (padrão: 10 km)
+raio_km = 10
+
+# OPCIONAL: só registros do GBIF destes países (código de 2 letras, ISO 3166;
+# vários separados por vírgula). Útil quando o polígono passa da fronteira:
+# com "pais = BR", espécies registradas só na Venezuela, Colômbia, Peru etc.
+# ficam de fora. Vazio = todos os registros dentro da área.
+# Mudar este filtro gera um download novo no GBIF (precisa de login).
+pais =
+
+# Palavras que identificam a região no título/resumo dos artigos, separadas
+# por vírgula (* = truncamento no PubMed: amazon* cobre Amazon, Amazonas,
+# Amazonia, Amazonian). Ex. para outra região: Pará, "Rio Negro", Manaus
+termos_texto = amazon*, Amazonas, Amazônia
+
+[taxons]
+# Gêneros e/ou espécies separados por vírgula (pode quebrar em várias linhas).
+# LISTA GRANDE? Coloque-a no arquivo lista_de_plantas.txt, na mesma pasta do
+# input.txt (nomes separados por vírgula, ponto e vírgula ou um por linha).
+# Se esse arquivo existir, ele SUBSTITUI esta seção, que passa a ser ignorada.
+# Gênero sozinho (ex.: Copaifera) inclui, na busca de compostos, as espécies
+# do gênero que estiverem na lista final (vindas do GBIF da região ou dos
+# artigos) - não espécies de outras regiões.
+# Os nomes da sua lista ficam INTACTOS: nenhum é trocado nem descartado. A
+# conferência em [taxonomia] só anota o nome aceito (coluna nome_aceito) e o
+# usa, junto com o seu, nas buscas de compostos e artigos.
+Euterpe oleracea, Euterpe precatoria, Carapa guianensis, Carapa surinamensis,
+Mauritia flexuosa, Theobroma cacao, Theobroma grandiflorum, Bertholletia excelsa,
+Copaifera, Paullinia cupana, Acmella oleracea, Astrocaryum murumuru,
+Oenocarpus bataua, Pentaclethra macroloba
+
+[termos_pubmed]
+# OPCIONAL. Deixe vazio para buscar QUALQUER atividade biológica.
+# Se preenchido, a etapa "pubmed" busca e aceita SOMENTE as atividades
+# listadas, e a etapa "chembl" liga os ensaios a elas. Na descoberta de
+# plantas em artigos (etapa "plantas") elas NÃO filtram: só são anotadas.
+# Os termos vão para o PubMed, então escreva-os em INGLÊS.
+#
+# Formatos aceitos (pode misturar):
+#   rótulo = termo1, termo2, ...   -> uma atividade com sinônimos; o rótulo
+#                                     (pode ser em português) aparece na saída
+#   termo1, termo2                 -> cada termo vira uma atividade separada
+#
+# Recursos do PubMed: truncamento com * (larvicid*) e tags de campo
+# (ex.: "Anti-Bacterial Agents"[mh] para buscar pelo descritor MeSH).
+#
+# Exemplos (retire o # para usar):
+# antibacteriana = antibacterial, antimicrobial, MIC, Staphylococcus aureus
+# larvicida = larvicid*, Aedes aegypti, mosquito larvae
+# anti-inflamatória = anti-inflammatory, edema, COX-2
+# antioxidant, wound healing
+
+# =============================================================================
+# PARÂMETROS TÉCNICOS (opcionais)
+# Se uma seção ou chave for apagada, vale o valor padrão indicado.
+# =============================================================================
+
+[artigos]
+# Descoberta de plantas em artigos (dentro da etapa "plantas"): artigos que
+# citam a REGIÃO (termos_texto, em [regiao]). Os nomes científicos citados
+# entram na lista. As atividades de [termos_pubmed] NÃO restringem a busca:
+# só são anotadas (coluna atividades_artigos de plantas.csv) quando aparecem
+# no texto do artigo.
+# (O Google Scholar não tem API e bloqueia acesso automatizado; o OpenAlex
+# é o substituto aberto, com revistas brasileiras e SciELO.)
+ativar = true
+usar_pubmed = true
+usar_openalex = true
+
+# Nº máximo de artigos lidos em CADA base (0 = todos). No PubMed, acima de
+# 10 mil a busca é dividida por ano de publicação automaticamente.
+max_artigos = 10000
+
+# true -> exige também um termo de contexto vegetal no texto (plant, extract,
+#         leaves, bark, seeds, fruit...): menos artigos de outros temas
+#         (malária, mercúrio, desmatamento...), mas pode perder alguns
+# false -> só os termos da região (padrão)
+contexto_vegetal = false
+
+# Chave gratuita do OpenAlex (https://openalex.org -> criar conta). Sem ela,
+# a cota diária do OpenAlex é muito pequena e a busca nele pode ser pulada.
+# PREFIRA colocá-la em config/credenciais.txt (OPENALEX_API_KEY), para não
+# expor a chave ao compartilhar este arquivo. Aqui, ela tem prioridade.
+openalex_api_key =
+
+[taxonomia]
+# Conferência dos nomes de TODAS as plantas (sua lista, GBIF e artigos) em
+# quatro bases. Para que serve:
+#   - anotar o nome ACEITO (coluna nome_aceito) - nenhum nome é trocado;
+#   - tirar da lista o que NÃO é planta entre os nomes do GBIF e dos artigos
+#     (pares de palavras, animais, fungos...) - a sua lista nunca é filtrada;
+#   - juntar duplicatas: nomes do GBIF/artigos que são a mesma espécie de um
+#     nome da sua lista entram na linha dele.
+# Se as bases discordarem, vale a primeira desta ordem (anotado em observacoes):
+#   1. Flora e Funga do Brasil (JBRJ) - lista oficial do Brasil
+#   2. World Flora Online (WFO)       - lista mundial (vasculares e briófitas)
+#   3. WCVP (Kew)                     - lista mundial de plantas vasculares
+#   4. GBIF                            - também fornece filo/classe/ordem/família
+usar_flora_brasil = true
+usar_wfo = true
+usar_wcvp = true
+usar_gbif = true
+
+# true -> reconhece grafias variantes (ex.: "Alpinia speciosas", "aefolia"/
+#         "iifolia") quando há um nome muito parecido no mesmo gênero. O nome
+#         não é trocado: a grafia das bases vai para nome_aceito
+corrigir_grafia = true
+
+# Distribuição por estado (colunas estados_br etc. de plantas.csv): vem da
+# Flora e Funga do Brasil. Para as plantas sem estado na Flora:
+# true  -> a etapa "gbif" pede ao GBIF, uma vez, uma tabela de espécie x estado
+#          (download em SQL, com o mesmo login; registros georreferenciados no
+#          Brasil) e a etapa "plantas" a usa para essas plantas (padrão)
+# false -> só a Flora
+estados_gbif = true
+
+# Deixe vazio para baixar automaticamente as versões mais recentes das listas
+# (alguns minutos e algumas centenas de MB, só na primeira vez). O WFO vem do
+# Zenodo (WFO Plant List, versão mais recente). Se um download falhar, você
+# pode baixar o arquivo pelo navegador e salvá-lo em dados_flora_brasil/
+# flora_brasil_dwca.zip, dados_wfo/WFO_Backbone.zip ou dados_wcvp/wcvp.zip
+# (WCVP: https://sftp.kew.org/pub/data-repositories/WCVP/wcvp.zip).
+flora_brasil_url =
+wfo_url =
+wcvp_url =
+
+[ollama]
+# Modelo de linguagem local (Ollama) da etapa "pubmed", que decide se cada
+# resumo relata relação POSITIVA de causa e efeito. Baixe antes: ollama pull <modelo>
+#   qwen3.5:35b-a3b  - recomendado (padrão): julga bem e é rápido (só ~3B
+#                      parâmetros ativos por resposta); ≈ 22 GB de memória
+#                      da GPU (ou memória unificada)
+#   gemma4:26b       - alternativa do mesmo nível (≈ 16 GB)
+#   qwen3.5:122b-a10b - o mais criterioso, ≈ 70 GB e ~3x mais lento
+#   llama3.1:8b      - para máquinas modestas (≈ 5 GB); erra mais nos casos sutis
+# Modelos de 1B a 4B erram muito nesse julgamento.
+modelo = qwen3.5:35b-a3b
+url = http://localhost:11434
+timeout_segundos = 180
+
+# Quantos resumos o modelo lê AO MESMO TEMPO (1 = um de cada vez). Com GPU e
+# memória de sobra, 4 costuma dar 2 a 3x mais resumos por hora. O Ollama
+# precisa aceitar pedidos simultâneos: OLLAMA_NUM_PARALLEL igual ou maior
+# (veja o README, seção 17). Sem isso, os pedidos esperam na fila do Ollama,
+# sem prejuízo.
+paralelo = 4
+
+# Modelos com "raciocínio" (Qwen 3.5/3.6, gpt-oss, alguns Gemma) pensam antes
+# de responder: muito mais lento e, para este julgamento curto, desnecessário.
+# false -> pede ao Ollama para desligar o raciocínio (padrão; modelos sem
+#          raciocínio, como o llama3.1, não são afetados)
+# true  -> deixa o modelo raciocinar (mais lento; às vezes mais criterioso)
+pensar = false
+
+[pubmed]
+# Nº máximo de resumos (mais relevantes) analisados por planta e por composto.
+# Com [termos_pubmed] preenchido, o limite vale para CADA atividade.
+max_artigos_por_planta = 20
+max_artigos_por_composto = 10
+
+# Teto de compostos pesquisados (0 = todos). Prioriza os que têm atividade
+# registrada no NPASS e os presentes em mais espécies. Para um 1º teste: 200.
+max_compostos = 0
+
+# Quais plantas de plantas.csv têm suas atividades buscadas no PubMed:
+#   todas          -> todas as espécies da lista (padrão), mesmo as sem
+#                     compostos conhecidos no COCONUT/NPASS
+#   com_compostos  -> só as que têm compostos (comportamento antigo, mais rápido)
+# As que têm compostos são pesquisadas primeiro.
+plantas_pesquisadas = todas
+# Teto de plantas pesquisadas (0 = todas). Para um 1º teste: 300.
+max_plantas = 0
+# true -> pesquisa também nomes não reconhecidos em nenhuma base de plantas
+incluir_nao_reconhecidos = false
+
+# Os artigos de cada composto são achados pelo InChIKey (artigos que o
+# PubChem associa ao composto) e, conforme esta opção, também pelo nome:
+#   complemento -> nome só para compostos sem nenhum artigo vinculado no PubChem
+#   sempre      -> nome para todos os compostos com nome pesquisável
+#   nunca       -> só InChIKey
+busca_composto_por_nome = complemento
+
+# Exclui artigos de revisão (só interessa evidência experimental primária)
+excluir_revisoes = true
+
+# Opcional, mas recomendado: chave gratuita do NCBI (≈3x mais rápido).
+# https://www.ncbi.nlm.nih.gov/account/ -> Account settings -> API Key
+# PREFIRA colocá-la em config/credenciais.txt (NCBI_API_KEY), para não
+# expor a chave ao compartilhar este arquivo. Aqui, ela tem prioridade.
+ncbi_api_key =
+# E-mail de contato enviado ao NCBI (boa prática). Se vazio, usa GBIF_EMAIL.
+email =
+
+[bioativos]
+# ESCOPO desta etapa (e, por consequência, do banco das etapas seguintes):
+#   regiao   -> só os compostos das plantas da sua região/lista (plantas.csv).
+#               É o escopo da PROSPECÇÃO de uma área (padrão).
+#   completo -> entram os compostos de TODAS as plantas das bases químicas.
+#               As de fora da região ficam com na_regiao = "não" e sem
+#               distribuição por estado. É o escopo da construção de um BANCO
+#               publicável (cobertura do espaço químico, sobreposição entre
+#               bases e viés de curadoria só fazem sentido sobre as bases
+#               inteiras). Organismos que não são plantas ficam de fora nos
+#               dois escopos: o reino é conferido nos gêneros do WFO e do WCVP,
+#               no próprio computador.
+# Atenção, no escopo completo: a saída fica MUITO maior (centenas de milhares
+# de compostos), a etapa usa alguns GB de memória a mais para carregar os
+# gêneros, e as etapas caras continuam restritas à região - a "pubmed" sempre,
+# e as consultas por composto ao PubChem conforme [banco]
+# enriquecer_apenas_regiao. Os gráficos também retratam só a região.
+escopo = regiao
+
+# REINO dos organismos aceitos. Só tem efeito com escopo = completo (no escopo
+# regional os organismos são casados contra o plantas.csv, que já é só de
+# plantas).
+#   vegetal  -> só plantas: o gênero de cada organismo das bases químicas é
+#               conferido nos gêneros do WFO e do WCVP (padrão)
+#   qualquer -> qualquer reino. É o que uma base de bactérias e fungos
+#               (NPAtlas) ou de metabólitos humanos (HMDB) precisa; veja
+#               a seção 26 do README para ligar uma base dessas sem alterar
+#               o pipeline
+reino = vegetal
+
+# FONTES DE COMPOSTOS acrescentadas depois: uma chave usar_<nome> por módulo
+# mods/fonte_<nome>.py. As do pacote (Dr. Duke, LOTUS, FooDB) estão logo
+# abaixo, com os nomes usar_duke, usar_lotus e usar_foodb.
+
+# true  -> só compostos com pelo menos 1 registro de atividade biológica no NPASS
+# false -> todos os produtos naturais registrados para as plantas (padrão)
+apenas_com_atividade_npass = false
+
+# false -> plantas cujo nome nenhuma base taxonômica reconheceu (situacao_nome
+#          = não reconhecido, ex.: bactérias citadas em artigos) não são
+#          buscadas no COCONUT/NPASS - continuam no plantas.csv, com aviso (padrão)
+# true  -> busca também esses nomes
+incluir_nao_reconhecidos = false
+
+# Deixe vazio para usar automaticamente a versão mais recente do COCONUT.
+coconut_url =
+
+# Dr. Duke's Phytochemical and Ethnobotanical Databases (USDA, domínio
+# público): acrescenta a PARTE DA PLANTA e o TEOR (ppm) de cada composto e as
+# ATIVIDADES atribuídas a ele (colunas parte_planta_duke, teor_ppm_duke e
+# atividades_duke). Os nomes dos compostos são convertidos em InChIKey pelo
+# PubChem (na 1ª vez, uma consulta por composto; depois, em cache).
+usar_duke = true
+duke_url =
+
+# LOTUS (aberto, CC0): acrescenta a REFERÊNCIA (DOI) dos artigos que relatam
+# cada composto em cada planta (coluna referencias_lotus). ~20 MB.
+usar_lotus = true
+lotus_url =
+
+# FooDB: compostos de ALIMENTOS (açaí, cacau, guaraná, castanha...), com o
+# alimento e o TEOR (colunas alimento_foodb e teor_foodb). Download de
+# ~950 MB. ATENÇÃO: uso acadêmico livre; uso COMERCIAL exige permissão dos
+# autores (https://foodb.ca). Use false se não puder usá-lo.
+usar_foodb = true
+foodb_url =
+
+# SMILES (estrutura) dos compostos: cada fonte em sua coluna (smiles_npass,
+# smiles_coconut, smiles_lotus, smiles_pubchem); conferencia_smiles compara
+# as estruturas entre elas. O SMILES escolhido (composto_smiles) segue a
+# ordem NPASS > COCONUT > LOTUS > PubChem.
+# true  -> busca no PubChem o SMILES de TODOS os compostos com InChIKey, para
+#          comparar com as bases e completar os que faltam (internet na 1ª
+#          vez: em lotes pelo CID e, sem CID, um a um; depois, em cache) (padrão)
+# false -> só as bases baixadas
+smiles_pubchem = true
+
+[chembl]
+# Etapa "chembl" (complemento ao PubMed): atividades MEDIDAS em ensaios no
+# ChEMBL, achando cada composto pelo InChIKey. Vão para as colunas
+# atividades_chembl (e atividades_previstas_chembl) de especies_atividades.csv.
+ativar = true
+
+# Potência mínima para um registro contar como ativo (pChEMBL = -log da
+# concentração molar): 5 = até 10 µM (padrão); 6 = até 1 µM (mais exigente).
+# Registros sem pChEMBL contam se o próprio ChEMBL os marcar como ativos.
+pchembl_minimo = 5
+
+# true -> se o InChIKey completo não existe no ChEMBL, procura moléculas com a
+#         mesma CONECTIVIDADE (14 primeiros caracteres do InChIKey): em geral o
+#         mesmo composto com outra configuração espacial. Marcado como
+#         "estereoisômero" no resultado.
+estereoisomeros = true
+
+# Arquivo de estruturas do ChEMBL (~300 MB, baixado uma vez para comparar os
+# InChIKeys localmente). Vazio = versão mais recente, automaticamente.
+estruturas_url =
+
+# true -> para compostos SEM atividade medida no ChEMBL, mostra as atividades
+#         de moléculas estruturalmente parecidas, como PREVISÃO (hipótese, não
+#         evidência), na coluna atividades_previstas_chembl. Usa o SMILES do
+#         COCONUT/NPASS. Uma consulta por composto: com milhares, leva horas.
+prever_por_similaridade = false
+# Similaridade mínima com a molécula vizinha, em % (70 a 100)
+similaridade_minima = 85
+
+[banco]
+# Etapas "normalizacao", "banco" e "qualidade" (v3.17): a partir dos compostos
+# já encontrados, montam o banco relacional na pasta banco/ (CSVs interligados
+# pelo InChIKey canônico), com perfil ADMET (RDKit) e análise de qualidade.
+# Recomenda-se o RDKit instalado (o instalar.sh já tenta): sem ele não há
+# recálculo de InChIKey, perfil ADMET nem detecção de conflitos de estrutura.
+
+# Normaliza os identificadores pelo PubChem (CID, InChI, SMILES, propriedades,
+# sinônimos). false = usa só o que já estiver em cache (sem rede).
+pubchem = true
+
+# Sinônimos por composto gravados em banco/sinonimos.csv (0 = nenhum do PubChem).
+max_sinonimos = 25
+
+# Classificação estrutural ClassyFire:
+#   faltantes -> consulta a API só para os compostos sem classe no COCONUT (padrão)
+#   todos     -> consulta todos e registra divergências com o COCONUT
+#   nao       -> usa só a classificação já presente no COCONUT
+classyfire = faltantes
+
+# true -> envia ao ClassyFire as estruturas que ele ainda não classificou e
+#         aguarda o resultado (padrão). Produto natural raro muitas vezes NÃO
+#         está na base do ClassyFire: sem isto, esses compostos ficam sem
+#         classe, o que reduz a cobertura da classificação estrutural e a
+#         informação da análise de espaço químico. É lento, e o que não
+#         terminar numa rodada é recolhido na seguinte.
+# false -> só aproveita o que o ClassyFire já tem classificado.
+classyfire_submeter = true
+
+# Vias metabólicas do PubChem. false = não consulta (mais rápido).
+vias_pubchem = true
+
+# FONTES DE ESPECTROS (tabela de dados espectrais do banco). Uma chave por
+# fonte, no formato espectros_<nome>; cada uma é um módulo mods/espectros_<nome>.py.
+# Para acrescentar o GNPS, o MassBank ou o MoNA basta criar o módulo da fonte -
+# nenhum arquivo do pipeline precisa ser alterado, e a chave passa a ser aceita
+# aqui. O guia está na seção 26 do README.
+#   teoricos -> m/z teóricos dos adutos mais comuns (RDKit, sem internet)
+#   pubchem  -> espectros experimentais compilados no PubChem (MS, MS/MS,
+#               GC-MS, LC-MS, RMN, IV, UV); um pedido por composto
+espectros_teoricos = true
+espectros_pubchem = true
+
+# Projeção UMAP dos fingerprints Morgan, na etapa "qualidade": mostra a
+# diversidade estrutural do banco num gráfico de dispersão
+# (banco/qualidade/espaco_quimico_umap.csv e g_espaco_quimico_umap.png).
+# Precisa do pacote umap-learn: pip install umap-learn
+umap = true
+# Quantos compostos no máximo entram na projeção (amostra aleatória com
+# semente fixa acima disso). A projeção é cara: acima de algumas dezenas de
+# milhares de compostos ela passa a dominar o tempo da etapa.
+umap_max = 50000
+
+# Idioma dos NOMES do banco em banco/ (arquivos, colunas e a chave universal):
+#   en -> compounds_identity_master.csv, compound_uid, scientific_name... É o
+#         produto que vai para o repositório e para publicação (padrão).
+#   pt -> compostos.csv, inchikey, nome_cientifico...
+# As planilhas de trabalho na raiz seguem em português nos dois casos, e o
+# dicionário de dados sai bilíngue (descricao_pt e description_en).
+idioma_banco = en
+
+# true -> as consultas de UM PEDIDO POR COMPOSTO (sinônimos e ClassyFire pela
+#         API, vias e espectros do PubChem) são feitas só para os compostos que
+#         ocorrem em alguma planta da região (padrão). Com [bioativos]
+#         escopo = completo isso é o que mantém a etapa viável: os compostos de
+#         fora ficam com o que vem de graça (PubChem em lote e a classificação
+#         do COCONUT). false = consulta todos.
+enriquecer_apenas_regiao = true
+
+# true -> acrescenta previsões do pacote admet-ai (rede neural; pesado) às
+#         colunas admetai_* de banco/perfil_admet.csv. Requer: pip install admet-ai
+admet_ai = false
+
+# true -> inclui os relatos de atividade do PubMed (etapa 5) em banco/bioatividade.csv
+incluir_pubmed = true

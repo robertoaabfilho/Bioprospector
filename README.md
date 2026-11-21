@@ -1,16 +1,16 @@
 # Pipeline de prospecção de plantas e compostos bioativos
 
-> **Versão 3.20** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
+> **Versão 3.22** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
 >
 > Você informa uma **região**, uma **lista de plantas** e as **atividades
 > biológicas** que interessam. O pipeline devolve planilhas com as plantas, os
 > compostos de cada uma e as atividades demonstradas em ensaios e artigos,
 > cada resultado com a sua referência. Ao fim, consolida tudo num **banco
-> relacional FAIR** (pasta `banco/`): CSVs interligados pelo InChIKey canônico,
+> relacional FAIR** (pasta `resultados/banco/`): CSVs interligados pelo InChIKey canônico,
 > com identidade química, proveniência, bioatividade, vias, espectros e perfil
 > ADMET, mais dicionário de dados, `datapackage.json` e análise de qualidade.
 > Também gera **gráficos**, reunidos num relatório HTML, e tem um **painel
-> interativo** (`./painel.sh`) para filtrar e cruzar os resultados no navegador.
+> interativo** (`mods/painel.sh`) para filtrar e cruzar os resultados no navegador.
 
 ---
 
@@ -110,7 +110,7 @@ Planilhas CSV, que abrem no Excel, no LibreOffice ou no Google Planilhas:
   resultado, para você conferir;
 - **gráficos** de cada etapa, gerados ao fim das etapas `plantas`,
   `bioativos`, `chembl` e `pubmed`, num relatório
-  `graficos/relatorio.html` que abre no navegador (seção 20).
+  `resultados/graficos/relatorio.html` que abre no navegador (seção 20).
 
 ---
 
@@ -145,8 +145,8 @@ produzido pela anterior e grava o seu.
                                                               especies_atividades.csv
                                                               evidencias_pubmed.csv
                                 │
- [gráficos]     ao fim das etapas 2 a 5 (e com ./graficos.sh,
-                a qualquer momento) ────────────────────────► graficos/relatorio.html
+ [gráficos]     ao fim das etapas 2 a 5 (e com mods/graficos.sh,
+                a qualquer momento) ────────────────────────► resultados/graficos/relatorio.html
 ```
 
 | # | Etapa | Pergunta que responde | Arquivo principal que produz |
@@ -231,15 +231,15 @@ contém `config/` e `mods/`) e rode o instalador.
 
 ```bash
 cd caminho/do/projeto
-chmod +x instalar.sh rodar.sh     # só se o zip tiver perdido as permissões
-./instalar.sh
+chmod +x mods/instalar.sh mods/rodar.sh     # só se o zip tiver perdido as permissões
+mods/instalar.sh
 ```
 
 **Windows** (Prompt de Comando)
 
 ```bat
 cd caminho\do\projeto
-instalar.bat
+mods\instalar.bat
 ```
 
 O instalador:
@@ -257,14 +257,14 @@ O instalador:
    **se ainda não existirem** (nunca sobrescreve os seus);
 5. confere se o Ollama e o modelo do `input.txt` estão instalados.
 
-No Windows, o `instalar.bat` usa o lançador `py` quando existe, exige
+No Windows, o `mods\instalar.bat` usa o lançador `py` quando existe, exige
 Python 3.10 ou mais recente e avisa se `python` abrir a Microsoft Store
 (atalho falso, desligável em *Configurações → Aplicativos → Aliases de
 execução de aplicativo*).
 
 > **Linux (Ubuntu/Debian)**: se o instalador avisar que falta o módulo
 > `venv`, rode `sudo apt install python3 python3-venv` e de novo
-> `./instalar.sh`.
+> `mods/instalar.sh`.
 
 **Instalação manual**, se preferir:
 
@@ -328,17 +328,9 @@ Reserve **pelo menos 6 GB**.
 ## 5. Estrutura de pastas
 
 ```
-pipeline/                       ← pasta do projeto: rode os comandos daqui
-├── README.md                   ← este guia
-├── instalar.sh  / instalar.bat ← instalação (Linux-macOS / Windows), uma vez
-├── rodar.sh     / rodar.bat    ← lançadores do pipeline (Linux-macOS / Windows)
-├── graficos.sh  / graficos.bat ← lançadores dos gráficos (seção 20)
-├── graficos.py                 ← script dos gráficos (só lê as planilhas)
-├── painel.sh    / painel.bat   ← lançadores do painel interativo (seção 20-A)
-├── painel.py                   ← painel interativo (Streamlit; só lê as planilhas)
-├── requirements.txt            ← pacotes Python
-├── .venv/                      ← ambiente Python (criado pelo instalador;
-│                                  .venv-win / .venv-linux em pasta compartilhada)
+pipeline/                       ← pasta do projeto
+├── Painel do pipeline (Linux)       ← abrem o painel com dois cliques (seção 20-A);
+├── Painel do pipeline (Windows).lnk   criados por mods/painel.sh atalho / mods\painel.bat atalho
 │
 ├── config/                     ← O QUE VOCÊ EDITA
 │   ├── input.txt               ← configuração da pesquisa
@@ -347,38 +339,73 @@ pipeline/                       ← pasta do projeto: rode os comandos daqui
 │   ├── input.txt.exemplo       ← modelo comentado
 │   └── credenciais.txt.exemplo ← modelo
 │
-├── mods/                       ← os scripts (não precisa mexer)
+├── mods/                       ← programas (não precisa mexer)
+│   ├── README.md               ← este guia
+│   ├── rodar.sh  / rodar.bat   ← lançadores do pipeline (Linux-macOS / Windows)
+│   ├── painel.sh / painel.bat  ← painel interativo (seção 20-A)
+│   ├── graficos.sh / graficos.bat ← exportar gráficos (seção 20)
+│   ├── instalar.sh / instalar.bat ← instalação, uma vez
+│   ├── organizar_pasta.sh / .bat  ← passa uma pasta antiga para este formato (seção 5.1)
+│   ├── requirements.txt        ← pacotes Python
 │   ├── main.py                 ← orquestrador: roda as etapas em ordem
-│   ├── baixar_bases.py         ← etapa 0
-│   ├── buscar_especies_gbif.py ← etapa 1
-│   ├── montar_lista_plantas.py ← etapa 2
-│   ├── cruzar_especies_bioativos.py ← etapa 3
-│   ├── consultar_chembl.py     ← etapa 4
-│   ├── consultar_atividades_pubmed.py ← etapa 5
+│   ├── baixar_bases.py … analisar_qualidade.py ← uma por etapa (0 a 8)
+│   ├── painel.py, graficos.py, diagnostico_leitura.py
+│   ├── caminhos.py             ← onde fica cada pasta (este esquema)
 │   └── (módulos auxiliares, tabela abaixo)
 │
-└── criados ao rodar, na raiz:
-    ├── dados_*/                ← bases baixadas (etapas 0 e 1)
-    ├── cache_*.jsonl           ← memória das consultas (seção 21)
-    ├── *.csv                   ← resultados (inclui especies_gbif_estados.csv)
-    ├── bases_baixadas.txt, diagnostico_pubmed.txt
-    └── graficos/               ← criada ao fim das etapas 2 a 5 (ou pelo
-                                   ./graficos.sh): relatorio.html, imagens e
-                                   dados/ (tabela de cada gráfico)
+├── dados/                      ← bases baixadas (etapas 0 e 1)
+│   ├── bioativos/  chembl/  flora_brasil/  gbif_download/  wcvp/  wfo/
+│   └── bases_baixadas.txt
+├── cache/                      ← memória das consultas: cache_*.jsonl (seção 21)
+├── resultados/                 ← tudo o que o pipeline produz
+│   ├── *.csv                   ← planilhas das etapas (seção 18)
+│   ├── banco/                  ← banco relacional e qualidade (etapas 6 a 8)
+│   ├── graficos/               ← gráficos exportados (seção 20)
+│   └── logs/                   ← registros das rodadas feitas pelo painel, do Ollama etc.
+│
+└── .venv/                      ← ambiente Python (criado pelo instalador; oculto;
+                                   .venv-win / .venv-linux em pasta compartilhada)
 ```
+
+Os comandos deste guia são rodados **da pasta do projeto** (por exemplo,
+`mods/rodar.sh --a-partir-de pubmed`; Windows: `mods\rodar.bat --a-partir-de pubmed`).
+Pelo painel, nada disso é preciso: a página **Rodar o pipeline** faz o mesmo.
+
+### 5.1 Pasta de uma versão anterior (tudo solto na raiz)
+
+Até a v3.20, caches, planilhas, bases e lançadores ficavam soltos na raiz.
+Para passar para o formato acima, **uma vez**, com o pipeline e o painel
+fechados:
+
+| Linux / macOS | Windows | Efeito |
+|---|---|---|
+| `bash mods/organizar_pasta.sh --simular` | `mods\organizar_pasta.bat --simular` | só mostra o plano |
+| `bash mods/organizar_pasta.sh` | `mods\organizar_pasta.bat` | mostra o plano, pergunta e move |
+
+- Só **move** arquivos (no mesmo disco é instantâneo): não baixa nem refaz
+  nada, e o que o modelo já leu continua no cache.
+- **Nada é apagado.** Vão para `_para_apagar/`, com um `LEIA-ME.txt`: as
+  cópias antigas dos lançadores e do `painel.py`/`graficos.py` (as novas estão
+  em `mods/`), os `*_parcial.csv` (o painel refaz ao abrir) e arquivos de
+  envio (`lista_pasta.txt`, `codigo_atual.zip`). Confira e apague a pasta.
+- O que ele não reconhece fica onde está, e ele avisa.
+- Recusa-se a rodar com o pipeline, a geração de parciais ou o painel
+  abertos (mover arquivos em uso quebraria a rodada).
+- Em pasta compartilhada Linux/Windows, basta rodar em um dos dois sistemas.
+- Sem isso, o pipeline novo para logo no início e mostra o comando acima.
 
 **Módulos auxiliares** (usados pelas etapas, não rodam sozinhos):
 
 | Arquivo | Função |
 |---|---|
-| `config_pipeline.py` | lê e valida o `input.txt` (`./rodar.sh config` mostra o resultado) |
+| `config_pipeline.py` | lê e valida o `input.txt` (`mods/rodar.sh config` mostra o resultado) |
 | `credenciais.py` | lê `config/credenciais.txt`; pergunta e abre o arquivo se faltar o login do GBIF |
 | `taxonomia.py` | conferência de nomes (Flora e Funga do Brasil, WFO, WCVP, GBIF) |
 | `distribuicao.py` | distribuição por estado (Flora e Funga do Brasil; GBIF para o que ela não cobre) |
 | `descoberta_artigos.py` | descoberta de plantas citadas em artigos (PubMed, OpenAlex) |
 | `literatura.py` | acesso ao PubMed, PubChem e OpenAlex; caches |
 | `duke.py`, `lotus.py`, `foodb.py` | leitura do Dr. Duke, do LOTUS e do FooDB |
-| `diagnostico_pubmed.py` | resumo do andamento da etapa 5 (`./rodar.sh diagnostico`) |
+| `diagnostico_pubmed.py` | resumo do andamento da etapa 5 (`mods/rodar.sh diagnostico`) |
 
 ---
 
@@ -418,8 +445,8 @@ começadas com `#` são comentários.
    o arquivo, para e avisa onde preencher.
 
 Outros detalhes:
-- **Conferir a qualquer momento**: `./rodar.sh credenciais`
-  (Windows: `rodar.bat credenciais`).
+- **Conferir a qualquer momento**: `mods/rodar.sh credenciais`
+  (Windows: `mods\rodar.bat credenciais`).
 - **Prioridade**: variáveis de ambiente já definidas (`GBIF_USER` etc.) >
   `config/credenciais.txt` > arquivos antigos `gbif_credenciais.env/.bat`
   (ainda lidos).
@@ -461,7 +488,7 @@ opcionais.
 - Arquivos salvos no Bloco de Notas (ANSI) ou com quebras de linha do
   Windows são lidos normalmente em qualquer sistema.
 - **Para ver como o arquivo foi entendido**, sem rodar nada:
-  `./rodar.sh config` (Windows: `rodar.bat config`).
+  `mods/rodar.sh config` (Windows: `mods\rodar.bat config`).
 
 ### 7.1 `[regiao]`: onde procurar
 
@@ -645,7 +672,7 @@ aparece.
 
 | Chave | Padrão | Função |
 |---|---|---|
-| `plantas_pesquisadas` | `todas` | `todas` = todas as espécies de `plantas.csv`; `com_compostos` = só as que têm compostos (mais rápido) |
+| `plantas_pesquisadas` | `todas` | `todas` = todas as espécies de `plantas.csv`; `com_compostos` = as que têm compostos **e as sem compostos citadas em artigos da descoberta com termo de atividade** (coluna `atividades_artigos`; mais rápido que `todas`) |
 | `max_plantas` | `0` | teto de plantas (0 = sem teto). Prioriza as com compostos e depois as com mais ocorrências na área |
 | `incluir_nao_reconhecidos` | `false` | pesquisa também nomes não reconhecidos |
 | `max_artigos_por_planta` | `20` | resumos mais relevantes por planta, **por atividade** |
@@ -677,22 +704,22 @@ continua valendo para `[regiao]`.
 
 ## 8. Primeira execução, passo a passo
 
-Nos exemplos, `./rodar.sh` é para Linux/macOS e `rodar.bat` para Windows.
+Nos exemplos, `mods/rodar.sh` é para Linux/macOS e `mods\rodar.bat` para Windows.
 Os dois aceitam exatamente as mesmas opções.
 
 | Passo | Linux / macOS | Windows | O que acontece |
 |---|---|---|---|
-| 1. Instalar | `./instalar.sh` | `instalar.bat` | cria o `.venv` e os arquivos de configuração (seção 4) |
+| 1. Instalar | `mods/instalar.sh` | `mods\instalar.bat` | cria o `.venv` e os arquivos de configuração (seção 4) |
 | 2. Credenciais (opcional) | `nano config/credenciais.txt` | `notepad config\credenciais.txt` | ou deixe o pipeline perguntar (seção 6) |
 | 3. Configurar | `nano config/input.txt` | `notepad config\input.txt` | região, lista e atividades (seção 7) |
-| 4. Conferir | `./rodar.sh config` | `rodar.bat config` | mostra como o `input.txt` foi entendido |
-| 5. Baixar as bases (opcional) | `./rodar.sh --somente downloads` | `rodar.bat --somente downloads` | 15–40 min, uma vez só |
-| 6. Rodar | `./rodar.sh` | `rodar.bat` | todas as etapas, em ordem |
+| 4. Conferir | `mods/rodar.sh config` | `mods\rodar.bat config` | mostra como o `input.txt` foi entendido |
+| 5. Baixar as bases (opcional) | `mods/rodar.sh --somente downloads` | `mods\rodar.bat --somente downloads` | 15–40 min, uma vez só |
+| 6. Rodar | `mods/rodar.sh` | `mods\rodar.bat` | todas as etapas, em ordem |
 
 > 💡 **Faça um teste pequeno primeiro.** Em `[pubmed]`, coloque
 > `max_plantas = 300` e `max_compostos = 200`. Em poucas horas você vê os
 > resultados e confere se a configuração está como queria. Depois volte os
-> dois para `0` e rode `./rodar.sh --a-partir-de pubmed --pular-downloads`.
+> dois para `0` e rode `mods/rodar.sh --a-partir-de pubmed --pular-downloads`.
 > Nada do que foi feito no teste é refeito.
 
 > 💡 **Execução longa no Linux (servidor, SSH)?** Use o `tmux` ou o `nohup`
@@ -706,34 +733,34 @@ Os dois aceitam exatamente as mesmas opções.
 
 | Comando | Efeito |
 |---|---|
-| `./rodar.sh` | todas as etapas, com `config/input.txt` |
-| `./rodar.sh --a-partir-de ETAPA` | começa na etapa indicada e segue até o fim |
-| `./rodar.sh --somente ETAPA` | roda só a etapa indicada |
-| `./rodar.sh --retomar` | pula as etapas cujo arquivo de saída principal já existe |
-| `./rodar.sh --pular-downloads` | não roda a etapa 0 (bases já baixadas) |
-| `./rodar.sh --atualizar-bases` | procura versões novas das bases e baixa de novo, com segurança (seção 12) |
-| `./rodar.sh --sem-gbif` | não usa o GBIF: a lista fica só com a sua lista e as plantas dos artigos |
-| `./rodar.sh --gbif-chave CHAVE` | usa um download do GBIF já feito em vez de pedir um novo (seção 13) |
-| `./rodar.sh --sem-graficos` | não gera os gráficos ao fim das etapas (seção 20) |
-| `./rodar.sh --input outro.txt` | usa outro arquivo de configuração. O caminho pode ser relativo à pasta onde você está, à raiz do projeto ou a `config/`. A `lista_de_plantas.txt` é procurada na mesma pasta desse arquivo |
+| `mods/rodar.sh` | todas as etapas, com `config/input.txt` |
+| `mods/rodar.sh --a-partir-de ETAPA` | começa na etapa indicada e segue até o fim |
+| `mods/rodar.sh --somente ETAPA` | roda só a etapa indicada |
+| `mods/rodar.sh --retomar` | pula as etapas cujo arquivo de saída principal já existe |
+| `mods/rodar.sh --pular-downloads` | não roda a etapa 0 (bases já baixadas) |
+| `mods/rodar.sh --atualizar-bases` | procura versões novas das bases e baixa de novo, com segurança (seção 12) |
+| `mods/rodar.sh --sem-gbif` | não usa o GBIF: a lista fica só com a sua lista e as plantas dos artigos |
+| `mods/rodar.sh --gbif-chave CHAVE` | usa um download do GBIF já feito em vez de pedir um novo (seção 13) |
+| `mods/rodar.sh --sem-graficos` | não gera os gráficos ao fim das etapas (seção 20) |
+| `mods/rodar.sh --input outro.txt` | usa outro arquivo de configuração. O caminho pode ser relativo à pasta onde você está, à raiz do projeto ou a `config/`. A `lista_de_plantas.txt` é procurada na mesma pasta desse arquivo |
 
 `ETAPA` é um destes: `downloads`, `gbif`, `plantas`, `bioativos`, `chembl`,
 `pubmed`.
 
-As opções se combinam. Exemplo: `./rodar.sh --a-partir-de bioativos
---pular-downloads`. No Windows, use `rodar.bat` com as mesmas opções.
+As opções se combinam. Exemplo: `mods/rodar.sh --a-partir-de bioativos
+--pular-downloads`. No Windows, use `mods\rodar.bat` com as mesmas opções.
 
 ### 9.2 Comandos auxiliares
 
 | Comando | Efeito |
 |---|---|
-| `./rodar.sh config` | mostra como o `input.txt` foi entendido; não roda nada |
-| `./rodar.sh credenciais` | mostra o sistema e a situação das credenciais; se faltar o login do GBIF, pergunta e abre o arquivo |
-| `./rodar.sh diagnostico` | resumo do andamento da etapa 5 → `diagnostico_pubmed.txt` (seção 10.3) |
-| `./rodar.sh parcial` | planilhas da etapa 5 com o que o modelo já leu → arquivos `*_parcial.csv` (seção 10.3) |
-| `./graficos.sh` | gráficos de todas as etapas já concluídas → `graficos/relatorio.html` (seção 20) |
-| `./graficos.sh --parcial` | idem, com a etapa 5 lida dos `*_parcial.csv` |
-| `./painel.sh` | painel interativo no navegador (`http://localhost:8501`): filtros, prospecção e fichas (seção 20-A) |
+| `mods/rodar.sh config` | mostra como o `input.txt` foi entendido; não roda nada |
+| `mods/rodar.sh credenciais` | mostra o sistema e a situação das credenciais; se faltar o login do GBIF, pergunta e abre o arquivo |
+| `mods/rodar.sh diagnostico` | resumo do andamento da etapa 5 → `diagnostico_pubmed.txt` (seção 10.3) |
+| `mods/rodar.sh parcial` | planilhas da etapa 5 com o que o modelo já leu → arquivos `*_parcial.csv` (seção 10.3); o painel faz isso sozinho (seção 20-A) |
+| `mods/graficos.sh` | gráficos de todas as etapas já concluídas → `resultados/graficos/relatorio.html` (seção 20) |
+| `mods/graficos.sh --parcial` | idem, com a etapa 5 lida dos `*_parcial.csv` |
+| `mods/painel.sh` | painel interativo no navegador (`http://localhost:8501`): filtros, prospecção e fichas (seção 20-A) |
 
 ### 9.3 Sem os lançadores
 
@@ -814,7 +841,7 @@ A leitura pelo modelo pode levar dias. Duas ferramentas mostram o andamento
 **sem atrapalhar a rodada principal**. Abra **outro terminal**, na mesma
 pasta:
 
-**`./rodar.sh parcial`** (Windows: `rodar.bat parcial`): gera as planilhas
+**`mods/rodar.sh parcial`** (Windows: `mods\rodar.bat parcial`): gera as planilhas
 com o que o modelo **já leu**.
 - Não acessa a internet e não lê nenhum artigo novo: usa só os caches.
 - Grava em arquivos separados, para não confundir com o resultado final:
@@ -825,10 +852,13 @@ com o que o modelo **já leu**.
 - Pode rodar quantas vezes quiser. Os `*_parcial.csv` podem ser apagados
   quando a rodada principal terminar.
 - **Para ver em gráficos**: depois do `parcial`, rode
-  `./graficos.sh --parcial` (seção 20). O gráfico *Julgamentos do modelo*
+  `mods/graficos.sh --parcial` (seção 20). O gráfico *Julgamentos do modelo*
   mostra quantos resumos já foram lidos e quantos deram positivo.
+- **No painel** (`mods/painel.sh`, seção 20-A) não é preciso rodar nada: com a
+  etapa 5 em andamento, ele gera os parciais sozinho, em segundo plano, e
+  mostra quantos resumos o modelo já leu.
 
-**`./rodar.sh diagnostico`**: grava `diagnostico_pubmed.txt` (alguns KB),
+**`mods/rodar.sh diagnostico`**: grava `diagnostico_pubmed.txt` (alguns KB),
 um resumo dos caches: quantas buscas foram feitas e quantas vieram vazias,
 quantos resumos foram baixados, quantos pares o modelo já julgou e quantos
 deram positivo. É o arquivo a mandar para alguém analisar o andamento, no
@@ -851,7 +881,7 @@ mostrar `GPU`.
 
 ```bash
 tmux new -s pipeline                       # abre uma sessão
-./rodar.sh --pular-downloads
+mods/rodar.sh --pular-downloads
 # Ctrl+B e depois D: sai da sessão SEM parar o pipeline (pode fechar o terminal)
 tmux attach -t pipeline                    # volta para ver o andamento
 ```
@@ -859,7 +889,7 @@ tmux attach -t pipeline                    # volta para ver o andamento
 **Linux/macOS com `nohup`** (registro em arquivo):
 
 ```bash
-nohup ./rodar.sh --pular-downloads > execucao.log 2>&1 &
+nohup mods/rodar.sh --pular-downloads > execucao.log 2>&1 &
 tail -f execucao.log                       # acompanha; Ctrl+C só para de acompanhar
 ```
 
@@ -870,14 +900,14 @@ tail -f execucao.log                       # acompanha; Ctrl+C só para de acomp
 **Windows**: deixe a janela do Prompt aberta. Para gravar um registro:
 
 ```bat
-rodar.bat --pular-downloads > execucao.log 2>&1
+mods\rodar.bat --pular-downloads > execucao.log 2>&1
 ```
 e acompanhe em outra janela do PowerShell com
 `Get-Content execucao.log -Wait -Tail 20`.
 
 **Impeça o computador de dormir** durante rodadas longas:
-- Linux: `systemd-inhibit --what=sleep:idle ./rodar.sh --pular-downloads`
-- macOS: `caffeinate -i ./rodar.sh --pular-downloads`
+- Linux: `systemd-inhibit --what=sleep:idle mods/rodar.sh --pular-downloads`
+- macOS: `caffeinate -i mods/rodar.sh --pular-downloads`
 - Windows: *Configurações → Sistema → Energia → Suspensão: Nunca* (durante
   a rodada).
 
@@ -912,10 +942,10 @@ Para não esperar as etapas que já terminaram, diga onde começar:
 
 | Situação | Comando |
 |---|---|
-| Parou na etapa 5 (o caso mais comum) | `./rodar.sh --a-partir-de pubmed --pular-downloads` |
-| Parou numa etapa qualquer | `./rodar.sh --a-partir-de ETAPA --pular-downloads` |
-| Não sei onde parou | `./rodar.sh --retomar --pular-downloads` |
-| Uma etapa falhou com erro | o próprio erro mostra o comando: `Corrija e retome com: ./rodar.sh --a-partir-de ETAPA` |
+| Parou na etapa 5 (o caso mais comum) | `mods/rodar.sh --a-partir-de pubmed --pular-downloads` |
+| Parou numa etapa qualquer | `mods/rodar.sh --a-partir-de ETAPA --pular-downloads` |
+| Não sei onde parou | `mods/rodar.sh --retomar --pular-downloads` |
+| Uma etapa falhou com erro | o próprio erro mostra o comando: `Corrija e retome com: mods/rodar.sh --a-partir-de ETAPA` |
 
 **`--a-partir-de` ou `--retomar`?**
 
@@ -929,7 +959,7 @@ Para não esperar as etapas que já terminaram, diga onde começar:
 ### 11.3 Rodar uma etapa só
 
 ```bash
-./rodar.sh --somente chembl
+mods/rodar.sh --somente chembl
 ```
 
 Útil para refazer uma etapa sem refazer as seguintes. Lembre que as etapas
@@ -965,7 +995,7 @@ correspondente (tabela completa na seção 21) e rode a etapa de novo.
 | reconferir todos os nomes | `cache_taxonomia_*.jsonl` | `--a-partir-de plantas` |
 | fazer o modelo reler todos os resumos | `cache_llm_classificacao.jsonl` ⚠️ | `--a-partir-de pubmed` |
 | atualizar os dados do ChEMBL | `cache_chembl_*.jsonl` (ou use `--atualizar-bases`) | `--a-partir-de chembl` |
-| um download novo do GBIF para a mesma região | `dados_gbif_download/pedidos.json` | `--a-partir-de gbif` |
+| um download novo do GBIF para a mesma região | `dados/gbif_download/pedidos.json` | `--a-partir-de gbif` |
 
 > ⚠️ **`cache_llm_classificacao.jsonl` guarda dias de trabalho do modelo.**
 > Em vez de apagá-lo, **mova-o** para uma pasta de reserva: se mudar de
@@ -981,7 +1011,7 @@ exceto o que nunca foi consultado).
 
 ```bash
 rm -f *.csv                      # Linux/macOS (Windows: del *.csv)
-./rodar.sh --pular-downloads     # Windows: rodar.bat --pular-downloads
+mods/rodar.sh --pular-downloads     # Windows: mods\rodar.bat --pular-downloads
 ```
 
 **Nível 2: refazer todas as consultas, mantendo as bases baixadas.** Uma
@@ -989,23 +1019,23 @@ pesquisa realmente nova, sem reaproveitar nada da internet nem do modelo.
 
 ```bash
 mkdir reserva && mv cache_*.jsonl *.csv reserva/     # Linux/macOS
-./rodar.sh --pular-downloads
+mods/rodar.sh --pular-downloads
 ```
 ```bat
 mkdir reserva
 move cache_*.jsonl reserva
 move *.csv reserva
-rodar.bat --pular-downloads
+mods\rodar.bat --pular-downloads
 ```
 
 **Nível 3: tudo do zero, inclusive as bases e o GBIF.**
 
 ```bash
-rm -rf dados_* cache_*.jsonl *.csv bases_baixadas.txt diagnostico_pubmed.txt     # Linux/macOS
-./rodar.sh
+rm -rf dados cache resultados     # Linux/macOS
+mods/rodar.sh
 ```
-No Windows: apague as pastas `dados_*` pelo Explorador de Arquivos e depois
-`del cache_*.jsonl *.csv bases_baixadas.txt`.
+No Windows: apague as pastas `dados`, `cache` e `resultados` pelo Explorador
+de Arquivos.
 
 Isso baixa de novo cerca de 5 GB e faz um pedido novo ao GBIF (precisa de
 login). Para só **atualizar** as bases, prefira `--atualizar-bases`, que é
@@ -1013,15 +1043,15 @@ seguro: se um download novo falhar, a versão anterior volta.
 
 ### 11.7 Levar a rodada para outro computador ou sistema
 
-Copie a pasta do projeto inteira: `config/`, `dados_*/`, os `cache_*.jsonl`
+Copie a pasta do projeto inteira: `config/`, `dados/`, os `cache_*.jsonl`
 e os `.csv`. Tudo é compatível entre Windows, Linux e macOS, e o pipeline
 continua de onde parou. No computador novo:
 
 1. **não copie o `.venv`** (ele não serve de um sistema para outro): rode o
    instalador. Se a MESMA pasta for usada pelos dois sistemas (disco
    compartilhado, dual boot), cada um fica com o seu ambiente: o
-   `instalar.sh` cria `.venv-linux` quando a `.venv` é do Windows, e o
-   `instalar.bat` cria `.venv-win` quando ela é do Linux. Os lançadores
+   `mods/instalar.sh` cria `.venv-linux` quando a `.venv` é do Windows, e o
+   `mods\instalar.bat` cria `.venv-win` quando ela é do Linux. Os lançadores
    escolhem o certo sozinhos;
 2. o `config/credenciais.txt` é o mesmo em todos os sistemas;
 3. instale o Ollama e o modelo.
@@ -1050,15 +1080,15 @@ funciona**, **saídas** e **retomada**.
 
 | Base | Usada na etapa | Onde fica |
 |---|---|---|
-| Flora e Funga do Brasil (IPT/JBRJ) | 2 | `dados_flora_brasil/flora_brasil_dwca.zip` |
-| World Flora Online (*WFO Plant List*, Zenodo; versão mais recente) | 2 | `dados_wfo/WFO_Backbone.zip` |
-| WCVP, World Checklist of Vascular Plants (Kew; ≈ 100 MB) | 2 | `dados_wcvp/wcvp.zip` |
-| COCONUT (CSV completo, com organismos) | 3 | `dados_bioativos/coconut_csv.zip`, `coconut_extraido/`, `coconut_versao.txt` |
-| NPASS 3.0 (6 arquivos) | 3 | `dados_bioativos/npass_*.txt` |
-| Dr. Duke (USDA) | 3 | `dados_bioativos/duke_csv.zip`, `duke_extraido/` |
-| LOTUS (export "frozen", Zenodo; ≈ 20 MB) | 3 | `dados_bioativos/lotus_frozen.csv.gz` |
-| FooDB (≈ 950 MB baixados; só 3 tabelas guardadas) | 3 | `dados_bioativos/foodb/` |
-| ChEMBL: estruturas (`chemreps.txt.gz`) | 4 | `dados_chembl/chembl_chemreps.txt.gz` |
+| Flora e Funga do Brasil (IPT/JBRJ) | 2 | `dados/flora_brasil/flora_brasil_dwca.zip` |
+| World Flora Online (*WFO Plant List*, Zenodo; versão mais recente) | 2 | `dados/wfo/WFO_Backbone.zip` |
+| WCVP, World Checklist of Vascular Plants (Kew; ≈ 100 MB) | 2 | `dados/wcvp/wcvp.zip` |
+| COCONUT (CSV completo, com organismos) | 3 | `dados/bioativos/coconut_csv.zip`, `coconut_extraido/`, `coconut_versao.txt` |
+| NPASS 3.0 (6 arquivos) | 3 | `dados/bioativos/npass_*.txt` |
+| Dr. Duke (USDA) | 3 | `dados/bioativos/duke_csv.zip`, `duke_extraido/` |
+| LOTUS (export "frozen", Zenodo; ≈ 20 MB) | 3 | `dados/bioativos/lotus_frozen.csv.gz` |
+| FooDB (≈ 950 MB baixados; só 3 tabelas guardadas) | 3 | `dados/bioativos/foodb/` |
+| ChEMBL: estruturas (`chemreps.txt.gz`) | 4 | `dados/chembl/chembl_chemreps.txt.gz` |
 
 - **Primeira vez**: baixa tudo (15–40 min). **Depois**: só confere e
   termina em segundos.
@@ -1130,13 +1160,13 @@ o pedido foi criado mesmo assim (para não abrir pedidos duplicados) e
 tenta de novo.
 
 **Reaproveitamento**: a chave de cada pedido fica em
-`dados_gbif_download/pedidos.json`. Rodar de novo com a **mesma região**
+`dados/gbif_download/pedidos.json`. Rodar de novo com a **mesma região**
 reaproveita o download, sem gastar cota nem esperar a fila. Para usar um
 download que você já fez (por exemplo, sem o filtro de países atual), use
-`--gbif-chave` com a chave dele: `./rodar.sh --somente gbif --gbif-chave
-0021558-261023074918325` (Windows: `rodar.bat --somente gbif --gbif-chave
+`--gbif-chave` com a chave dele: `mods/rodar.sh --somente gbif --gbif-chave
+0021558-261023074918325` (Windows: `mods\rodar.bat --somente gbif --gbif-chave
 0021558-261023074918325`). Se o zip desse download já estiver em
-`dados_gbif_download/`, o GBIF nem é consultado.
+`dados/gbif_download/`, o GBIF nem é consultado.
 
 **Saídas**
 
@@ -1159,7 +1189,7 @@ só na região). Vem de um segundo pedido, em SQL, feito uma vez e
 reaproveitado nas rodadas seguintes; serve à distribuição por estado da
 etapa `plantas`.
 
-Também: `dados_gbif_download/` (pedidos, zip e dados extraídos, cache dos
+Também: `dados/gbif_download/` (pedidos, zip e dados extraídos, cache dos
 nomes populares).
 
 **Retomada**: se a espera for interrompida, a próxima rodada reaproveita o
@@ -1660,8 +1690,17 @@ divisão CPU/GPU, o modelo não coube na placa e tudo fica muito mais lento).
 **Vários resumos ao mesmo tempo** (`paralelo` em `[ollama]`, padrão 4): o
 pipeline manda vários pares ao Ollama de uma vez, e cada resposta vai para
 o cache assim que chega. Para isso valer, o Ollama precisa aceitar pedidos
-simultâneos:
+simultâneos (`OLLAMA_NUM_PARALLEL`):
 
+- **Iniciado pelo pipeline ou pelo painel**: já sai certo. Se o Ollama estiver
+  fora do ar, a etapa 5 o inicia sozinha (`ollama serve`, registro em
+  `resultados/logs/ollama.log`), e o botão *Iniciar o Ollama* do painel faz o
+  mesmo, ambos com `OLLAMA_NUM_PARALLEL` igual ao `paralelo`. Se a variável
+  já estiver definida no ambiente, vale a do ambiente.
+- **Ollama que já estava rodando**: no Linux, a etapa 5 confere quantos
+  pedidos simultâneos ele aceita e avisa (`AVISO: [ollama] paralelo = 4, mas
+  o Ollama em execução aceita só 1...`). Pare-o e rode a etapa de novo, ou
+  configure como abaixo.
 - **Linux** (Ollama como serviço): `sudo systemctl edit ollama`, acrescente
   ```
   [Service]
@@ -1675,19 +1714,43 @@ simultâneos:
   depois abra de novo).
 
 Sem isso, os pedidos simplesmente esperam na fila do Ollama: nada quebra, só
-não acelera. Cada pedido simultâneo ocupa mais memória da placa; se aparecer
+não acelera.
+
+**Atenção, Qwen 3.5 MoE (`qwen3.5:35b-a3b`)**: até o Ollama 0.40.13, essa
+arquitetura (`qwen35moe`) não aceita pedidos simultâneos, mesmo com
+`OLLAMA_NUM_PARALLEL` definido. O `ollama.log` mostra `model architecture
+does not currently support parallel requests` e `n_slots = 1`, e a leitura
+continua a ~2 s por par. Nesse caso, `paralelo` não acelera até uma versão
+do Ollama tirar essa restrição. Cada pedido simultâneo ocupa mais memória da placa; se aparecer
 falta de memória ou divisão CPU/GPU no `ollama ps`, use `paralelo = 2`.
 
 **Ordem de leitura**: primeiro as plantas (as com compostos e mais
 ocorrências primeiro), depois os compostos (os com atividade no NPASS e em
 mais plantas primeiro). Assim, os resultados mais úteis ficam prontos
-antes.
+antes. As plantas sem compostos (inclusive as que entram por citação em
+artigos, abaixo) vêm logo depois das com compostos, as citadas em mais
+artigos primeiro, e antes dos compostos: são poucos milhares de artigos,
+contra centenas de milhares dos compostos.
 
 **Quais plantas são pesquisadas**: por padrão, todas as espécies de
 `plantas.csv`, inclusive as sem compostos conhecidos (uma planta pouco
 estudada quimicamente pode ter atividade relatada para o extrato). Ficam de
 fora: gêneros sem espécie, nomes `não reconhecido`, as sem compostos se
-`plantas_pesquisadas = com_compostos`, e as que passam de `max_plantas`.
+`plantas_pesquisadas = com_compostos` (**exceto** as citadas em artigos da
+descoberta com termo de atividade, que entram), e as que passam de
+`max_plantas` (as citadas em artigos são as primeiras a sair do limite).
+
+**Artigos da descoberta**: além dos artigos achados pela busca por nome,
+o modelo lê os artigos da descoberta (etapa 2, `plantas_artigos_evidencias.csv`)
+que citam a planta **e** um termo de atividade, até `max_artigos_por_planta`
+por planta, os mais recentes primeiro. Só os que têm PMID: os que vieram só
+do OpenAlex (`DOI ...`, `OpenAlex ...`) não têm resumo no PubMed e ficam de
+fora (o log informa quantos). O resumo já está no cache da etapa 2, então não
+há download novo. Como a etapa 2 já conferiu que o artigo cita a planta
+(inclusive abreviada, como *E. uchi*), esses artigos não passam pelo
+pré-filtro de menção, e o modelo recebe também a forma do nome usada no
+artigo. Na planilha `evidencias_pubmed.csv`, a coluna `via_busca` indica
+`descoberta`.
 
 **Saídas**: quatro planilhas, descritas em detalhe na seção 18.
 
@@ -1964,12 +2027,12 @@ Uma linha por artigo positivo:
 | `tipo_estudo` | in vitro / ex vivo / in vivo / clínico |
 | `parte_planta` | só para plantas |
 | `justificativa_llm` | frase curta do modelo citando o resultado |
-| `via_busca` | `nome`, `InChIKey` ou `InChIKey + nome` |
+| `via_busca` | `nome`, `InChIKey`, `descoberta` (artigo da etapa 2) ou combinações (ex.: `nome + descoberta`) |
 
 ### 18.6 Um roteiro de leitura
 
-0. Para ter a visão de conjunto antes das planilhas, rode `./graficos.sh` e
-   abra `graficos/relatorio.html` (seção 20): o funil da visão geral e o
+0. Para ter a visão de conjunto antes das planilhas, rode `mods/graficos.sh` e
+   abra `resultados/graficos/relatorio.html` (seção 20): o funil da visão geral e o
    *mapa de oportunidades* da etapa 5 apontam por onde começar.
 1. Em `atividades_plantas.csv`, filtre `n_artigos_positivos > 0` e ordene
    por `melhor_evidencia_planta`. Plantas com estudo **in vivo** ou
@@ -1996,10 +2059,10 @@ Quando não há atividade, a célula explica o motivo.
 | `nenhuma relação causal positiva encontrada…` | houve artigos, mas nenhum demonstrou a atividade | — |
 | `nenhum artigo encontrado no PubMed` | as buscas não trouxeram artigos | — |
 | `artigos encontrados; leitura pelo modelo pendente` | só nos arquivos `*_parcial.csv`: ainda não lido | esperar a rodada principal |
-| `busca pendente (rode de novo)` | alguma busca falhou (rede, limite do NCBI) | `./rodar.sh --a-partir-de pubmed` |
+| `busca pendente (rode de novo)` | alguma busca falhou (rede, limite do NCBI) | `mods/rodar.sh --a-partir-de pubmed` |
 | `não pesquisado: táxon sem nível de espécie` | gênero sozinho | — |
 | `não pesquisado: nome não reconhecido em nenhuma base…` | nome não reconhecido | `[pubmed] incluir_nao_reconhecidos = true`, se quiser |
-| `não pesquisado: plantas_pesquisadas = com_compostos` | planta sem compostos, excluída pela opção | `plantas_pesquisadas = todas` |
+| `não pesquisado: plantas_pesquisadas = com_compostos` | planta sem compostos e sem citação em artigos da descoberta com termo de atividade, excluída pela opção | `plantas_pesquisadas = todas` |
 | `não pesquisado: fora do limite max_plantas` | passou do teto | aumente ou zere `max_plantas` |
 | `não pesquisado: fora do limite max_compostos` | passou do teto | aumente ou zere `max_compostos` |
 | `não pesquisado: sem vínculo no PubChem e sem nome adequado para busca` | sem artigos ligados ao CID e com nome só sistemático | — |
@@ -2018,7 +2081,12 @@ Quando não há atividade, a célula explica o motivo.
 
 ## 20. Gráficos dos resultados
 
-`graficos.py` → `graficos/relatorio.html`
+`mods/graficos.py` → `resultados/graficos/relatorio.html`
+
+O painel (seção 20-A) mostra os resultados de forma interativa; o
+`graficos.py` serve para **exportar figuras** (PNG, SVG ou PDF, para artigos
+e apresentações) e um relatório que abre sem o painel e pode ser enviado a
+outras pessoas.
 
 **Objetivo**: ver os resultados de cada etapa em gráficos, sem abrir as
 planilhas uma a uma. Funciona com as saídas das versões 3 a 3.10. O script **só lê** os arquivos
@@ -2027,28 +2095,32 @@ interfere numa rodada em andamento.
 
 ### 20.1 Como rodar
 
-**Automático**: a partir da versão 3.7, o próprio pipeline gera os gráficos
-ao terminar as etapas `plantas`, `bioativos`, `chembl` e `pubmed` (os da
-etapa e os da visão geral) e atualiza `graficos/relatorio.html`, que vai
-acumulando as etapas. Um problema nos gráficos nunca interrompe o pipeline:
-vira só um aviso. Para desligar: `./rodar.sh --sem-graficos`.
+**Pelo painel**: página **Rodar o pipeline → Utilitários → Exportar os
+gráficos** (formato, resolução e tamanho dos rankings).
+
+**Automático (desligado por padrão)**: com `[graficos]` `automatico = sim` no
+`input.txt` (ou `mods/rodar.sh --com-graficos`), o pipeline gera os gráficos
+ao terminar as etapas `plantas`, `bioativos`, `chembl` e `pubmed`. Ficou
+desligado porque, com planilhas grandes, custa minutos a cada etapa e o
+painel já mostra o mesmo. Um problema nos gráficos nunca interrompe o
+pipeline: vira só um aviso.
 
 **À mão**, a qualquer momento:
 
 | Linux / macOS | Windows | Efeito |
 |---|---|---|
-| `./graficos.sh` | `graficos.bat` | gráficos de todas as etapas já concluídas |
-| `./graficos.sh --parcial` | `graficos.bat --parcial` | etapa 5 a partir dos `*_parcial.csv` (rode antes `./rodar.sh parcial`) |
-| `./graficos.sh --etapas plantas,pubmed` | idem | só as etapas indicadas |
-| `./graficos.sh --top 40` | idem | rankings com 40 itens (padrão: 25) |
-| `./graficos.sh --formato svg` | idem | arquivos em SVG (ou `pdf`) para publicação; o relatório continua com PNG |
-| `./graficos.sh --dpi 300` | idem | PNG em alta resolução (padrão: 150) |
-| `./graficos.sh --pasta graficos_amazonas` | idem | outra pasta de saída (para guardar rodadas diferentes) |
+| `mods/graficos.sh` | `mods\graficos.bat` | gráficos de todas as etapas já concluídas |
+| `mods/graficos.sh --parcial` | `mods\graficos.bat --parcial` | etapa 5 a partir dos `*_parcial.csv` (rode antes `mods/rodar.sh parcial`) |
+| `mods/graficos.sh --etapas plantas,pubmed` | idem | só as etapas indicadas |
+| `mods/graficos.sh --top 40` | idem | rankings com 40 itens (padrão: 25) |
+| `mods/graficos.sh --formato svg` | idem | arquivos em SVG (ou `pdf`) para publicação; o relatório continua com PNG |
+| `mods/graficos.sh --dpi 300` | idem | PNG em alta resolução (padrão: 150) |
+| `mods/graficos.sh --pasta graficos_amazonas` | idem | outra pasta de saída (para guardar rodadas diferentes) |
 
 Os nomes de etapa em `--etapas` são `geral`, `downloads`, `gbif`,
 `plantas`, `bioativos`, `chembl` e `pubmed`.
 
-- O `matplotlib` é instalado pelo `instalar.sh` / `instalar.bat`; numa
+- O `matplotlib` é instalado pelo `mods/instalar.sh` / `mods\instalar.bat`; numa
   instalação antiga, o lançador o instala na primeira vez (precisa de
   internet só nesse momento). Sem os lançadores:
   `.venv/bin/python graficos.py` (Windows: `.venv\Scripts\python graficos.py`).
@@ -2135,7 +2207,7 @@ citadas nos artigos* exige `[termos_pubmed]` preenchido ou a versão 3.2, e *Par
 - As **atividades** da etapa 5 são os rótulos escritos pelo modelo; nomes
   parecidos (`antibacteriana` e `antimicrobiana`) aparecem separados.
 - No **modo parcial**, os números da etapa 5 crescem a cada rodada do
-  `./rodar.sh parcial`: anote a data do relatório (aparece no topo).
+  `mods/rodar.sh parcial`: anote a data do relatório (aparece no topo).
 - Cores: a paleta foi escolhida para ser distinguível por pessoas com
   daltonismo, e nenhuma informação depende só da cor (há rótulos e
   legendas em todos os gráficos).
@@ -2147,27 +2219,72 @@ citadas nos artigos* exige `[termos_pubmed]` preenchido ou a versão 3.2, e *Par
 `painel.py` → abre no navegador, em `http://localhost:8501`
 
 **Objetivo**: explorar os resultados de cada etapa com filtros, cruzar as
-etapas e baixar recortes, sem abrir as planilhas uma a uma. O painel **só lê**
-os arquivos do pipeline: não altera nenhuma planilha nem cache, não consulta a
-internet e pode ficar aberto com o pipeline rodando.
+etapas e baixar recortes, sem abrir as planilhas uma a uma; e, pela página
+**Rodar o pipeline**, rodar e interromper etapas, ligar o Ollama, acompanhar a
+GPU e conferir a instalação, sem terminal. As páginas de resultados só leem as
+planilhas e podem ficar abertas com o pipeline rodando.
 
 ### 20-A.1 Como abrir
 
+**Pelo ícone (sem terminal).** Crie o ícone uma vez, de um terminal na pasta
+do projeto (com o Python do pipeline ativo, por exemplo o ambiente conda):
+
+| Linux / macOS | Windows | Cria |
+|---|---|---|
+| `mods/painel.sh atalho` | `mods\painel.bat atalho` | Linux: o programa `Painel do pipeline (Linux)` na pasta do projeto (dois cliques no gerenciador de arquivos), o item **Painel do pipeline** no menu de aplicativos (para fixar na barra lateral: na lista de aplicativos, botão direito → **Fixar no Dash**) e um ícone na área de trabalho. Windows: `Painel do pipeline (Windows).lnk` na pasta do projeto e na área de trabalho |
+
+Clicar no ícone abre o painel no navegador. Se ele já estiver aberto, só abre
+o navegador nele (não cria uma segunda cópia); senão, inicia o painel em
+segundo plano, sem janela, com o registro em `resultados/logs/painel.log`.
+O ícone guarda o caminho do Python usado ao criá-lo (a sessão gráfica não lê
+o `.bashrc`, onde o conda costuma ser ativado; no Linux, fica em
+`mods/.python_painel`): se trocar de ambiente, crie o ícone de novo. No
+Linux, o da pasta é um programa pequeno (x86-64 ou ARM64, escolhido sozinho;
+código em `mods/painel_lancador.c`), porque o gerenciador de arquivos do
+Ubuntu (desde o 22.04) não abre atalhos `.desktop` nem scripts com dois
+cliques. Em pasta compartilhada, cada sistema cria o seu (os dois
+convivem na pasta). No Ubuntu (GNOME), se o ícone da área de trabalho pedir
+permissão: botão direito → **Permitir iniciar**.
+
+**Pelo terminal:**
+
 | Linux / macOS | Windows | Efeito |
 |---|---|---|
-| `./painel.sh` | `painel.bat` | abre o painel no navegador |
-| `./painel.sh --server.port 8502` | `painel.bat --server.port 8502` | outra porta (se a 8501 estiver ocupada) |
+| `mods/painel.sh` | `mods\painel.bat` | abre o painel no navegador (Ctrl+C fecha) |
+| `mods/painel.sh --abrir` | `mods\painel.bat --abrir` | o mesmo que o ícone: abre sem prender o terminal |
+| `mods/painel.sh --server.port 8502` | `mods\painel.bat --server.port 8502` | outra porta |
 
 - **Na primeira vez**, o lançador instala o `streamlit` no ambiente do
-  pipeline (`.venv`, `.venv-linux` ou `.venv-win`); precisa de internet só
-  nesse momento. Sem os lançadores: `.venv/bin/python -m streamlit run painel.py`
-  (Windows: `.venv\Scripts\python -m streamlit run painel.py`).
-- **Para fechar**: `Ctrl+C` no terminal onde o painel foi aberto.
+  pipeline; precisa de internet só nesse momento.
+- **Para fechar**: **Configurações → Fechar o painel** (ou Ctrl+C no
+  terminal, se foi aberto por ele). O pipeline e o Ollama, se estiverem
+  rodando, continuam.
 - **Etapas que ainda não rodaram** aparecem com um aviso; o resto do painel
   funciona normalmente. Depois de uma nova rodada, use **Configurações →
   Recarregar os dados** (ou só atualize a página: arquivos alterados são relidos).
-- **Com a etapa 5 em andamento**: rode `./rodar.sh parcial` e ligue
-  **Configurações → Modo parcial**, para ler os `*_parcial.csv`.
+- **Com a etapa 5 (pubmed) em andamento**, o painel mostra sozinho os
+  **resultados parciais**, sem precisar rodar `mods/rodar.sh parcial`:
+  - um quadro na barra lateral diz que a etapa está rodando, quantos resumos
+    o modelo já julgou e de quando são os parciais na tela;
+  - **toda vez que o painel é aberto**, ele roda na hora, em segundo plano, o
+    mesmo modo parcial do `mods/rodar.sh parcial` (só os caches, sem internet). O
+    navegador abre logo, com os parciais anteriores, e a página se refaz quando
+    os novos ficam prontos;
+  - com o painel aberto, ele gera de novo quando o modelo leu algo novo, no
+    máximo a cada **10 minutos** (ajustável em **Configurações**). O botão
+    **Atualizar os parciais agora** não espera o intervalo;
+  - as páginas 5 · PubMed, Prospecção e Ficha usam os parciais. As planilhas
+    finais de uma rodada anterior, se existirem, ficam de lado até a etapa
+    terminar;
+  - o **banco relacional e a qualidade** (etapas 6 a 8) ficam indisponíveis
+    até a etapa 5 terminar, porque dependem dela. As páginas de compostos e
+    ensaios usam, enquanto isso, as planilhas das etapas 3 e 4;
+  - quando a etapa termina, o painel volta sozinho às planilhas finais;
+  - enquanto uma geração roda, o quadro diz quando ela começou e quanto levou
+    a anterior. Os números na tela continuam os dos parciais anteriores até a
+    nova terminar: numa rodada grande (dezenas de milhares de resumos lidos),
+    cada geração leva vários minutos. Fechar ou reabrir o painel no meio dela
+    não dispara uma segunda geração.
 - **Outra pasta**: em **Configurações → Pasta do projeto** dá para apontar
   para outra rodada (por exemplo, uma cópia de outra região).
 - **Com `[bioativos]` `escopo = completo`**: o interruptor **Configurações →
@@ -2184,20 +2301,74 @@ internet e pode ficar aberto com o pipeline rodando.
 
 | Página | Lê | O que dá para fazer |
 |---|---|---|
-| **Início** | todos os arquivos de saída | situação de cada etapa (concluída ou não, linhas, data) e o funil plantas → compostos → atividade |
+| **Início** | todos os arquivos de saída | situação de cada etapa (concluída, em andamento ou aguardando a etapa 5; linhas, data) e o funil plantas → compostos → atividade |
+| **Rodar o pipeline** | `mods/`, `resultados/logs/` | ver 20-A.4: rodar tudo, uma etapa ou a partir de uma etapa, com as opções do `main.py`; interromper; registro na tela; utilitários (exportar gráficos, conferir o `input.txt`, resumo da etapa 5, credenciais); Ollama; GPU; instalação |
 | **1 · GBIF** | `especies_gbif.csv` | filtrar por família, nome e número de registros; espécies e famílias mais registradas; link para o GBIF |
-| **2 · Plantas** | `plantas.csv`, `plantas_conferencia_taxonomica.csv`, `plantas_descartados.csv` | filtrar por família, fonte, situação do nome, **estado, domínio, endemismo e origem**; gráficos por estado, plantas restritas a um estado, domínios e endemismo por domínio; conferência dos nomes e nomes descartados |
-| **3 · Compostos** | `banco/compostos.csv` e `banco/perfil_admet.csv` (sem o banco: `especies_com_compostos_bioativos.csv`) | filtrar por planta, família, base, via biossintética, superclasse, QED, massa molecular, **Lipinski** e **alertas PAINS**; classes químicas e **espaço químico** (massa × logP, ou NP-likeness × QED); link para o PubChem |
+| **2 · Plantas** | `plantas.csv`, `plantas_conferencia_taxonomica.csv`, `plantas_descartados.csv` | filtrar por família, fonte, situação do nome, **estado, domínio, endemismo e origem**; gráficos por estado, plantas restritas a um estado, domínios e endemismo por domínio; conferência dos nomes e nomes descartados. **Da etapa 5**: colunas artigos positivos, atividades (PubMed), melhor evidência e situação na etapa 5, e filtros por situação, atividade e evidência mínima (parciais, com a etapa 5 rodando) |
+| **3 · Compostos** | `banco/compostos.csv` e `banco/perfil_admet.csv` (sem o banco: `especies_com_compostos_bioativos.csv`) | filtrar por planta, família, base, via biossintética, superclasse, QED, massa molecular, **Lipinski** e **alertas PAINS**; classes químicas e **espaço químico** (massa × logP, ou NP-likeness × QED); link para o PubChem. **Da etapa 5**: as mesmas colunas e filtros da página Plantas, por composto |
 | **4 · ChEMBL** | `banco/bioatividade.csv` (ChEMBL e NPASS) ou `evidencias_chembl.csv`, e `compostos_chembl.csv` | filtrar por atividade, alvo, organismo, tipo de ensaio, medida, correspondência e **pChEMBL mínimo**; potência, alvos e medidas; link para o artigo |
-| **5 · PubMed** | `evidencias_pubmed.csv`, `atividades_plantas.csv`, `atividades_compostos.csv` | filtrar por atividade, **evidência mínima** (clínico > in vivo > ex vivo > in vitro), **coleta sustentável** e ano; resumo, plantas, compostos e a lista de artigos com a justificativa do modelo e o link |
-| **Prospecção** | as etapas 2 a 5 (e o banco) | **plantas candidatas**: escolha as atividades, a evidência mínima, o pChEMBL mínimo, a coleta e a distribuição; para cada planta, os artigos positivos sobre ela e os compostos dela com atividade (em artigos e em ensaios). Sem nota opaca: você escolhe a ordenação (por exemplo, "menos compostos conhecidos", para química pouco explorada) |
+| **5 · PubMed** | `evidencias_pubmed.csv`, `atividades_plantas.csv`, `atividades_compostos.csv` | filtrar por atividade, **evidência mínima** (clínico > in vivo > ex vivo > in vitro), **coleta sustentável** e ano; resumo, plantas, compostos e a lista de artigos com a justificativa do modelo e o link. Aba **Leitura do modelo**: quanto o modelo já leu e quanto falta em cada grupo (plantas com compostos, plantas sem compostos citadas na descoberta, compostos), o ritmo, a previsão de término e quem ainda tem artigo por ler, inclusive quem já tem positivo (roda o `diagnostico_leitura.py`, sem internet) |
+| **Prospecção** | as etapas 2 a 5 (e o banco) | **plantas candidatas**: escolha as atividades, a evidência mínima, o pChEMBL mínimo, a coleta e a distribuição; para cada planta, os artigos positivos sobre ela e os compostos dela com atividade (em artigos e em ensaios). Sem nota opaca: você escolhe a ordenação (por exemplo, "menos compostos conhecidos", para química pouco explorada). Aba **Sem compostos, com artigos da descoberta**: as plantas sem nenhum composto nas bases da etapa 3 que aparecem em artigos da etapa 2 (`atividades_artigos` e `plantas_artigos_evidencias.csv`), com filtros de atividade citada, família e distribuição, a situação de cada uma na etapa 5 e a lista de artigos de uma planta, com links |
 | **Ficha** | tudo | **uma planta**: dados, distribuição, artigos positivos e compostos, com a atividade de cada um. **Um composto**: identidade, perfil ADMET, plantas em que ocorre, ensaios, artigos, vias, espectros, sinônimos e conflitos entre bases |
-| **6–8 · Banco e qualidade** | pasta `banco/` (em inglês ou em português) | número de linhas e conteúdo de cada tabela, com o dicionário de dados bilíngue; drogabilidade (filtros de Lipinski, Veber, Ghose, Egan, Muegge, BOILED-Egg, QED, PAINS); conflitos entre bases por tipo e severidade; planilhas e relatório da etapa `qualidade` |
+| **6–8 · Banco e qualidade** | pasta `banco/` (em inglês ou em português), só com a etapa 5 concluída | número de linhas e conteúdo de cada tabela, com o dicionário de dados bilíngue; drogabilidade (filtros de Lipinski, Veber, Ghose, Egan, Muegge, BOILED-Egg, QED, PAINS); conflitos entre bases por tipo e severidade; planilhas e relatório da etapa `qualidade` |
 
 Os filtros ficam na barra lateral e valem para a página inteira. Cada tabela
 tem um botão **Baixar esta tabela (CSV)**, que grava exatamente o recorte
 filtrado (UTF-8 com BOM, abre no Excel). As tabelas mostram até 20.000 linhas;
 o download traz todas.
+
+### 20-A.4 Rodar o pipeline pelo painel
+
+Página **Rodar o pipeline**, com três abas.
+
+**Rodar.** Escolha *a partir de uma etapa*, *só uma etapa*, *tudo* ou um
+*utilitário*; em **Opções**, as mesmas do terminal (`--retomar`,
+`--pular-downloads`, `--atualizar-bases`, `--sem-gbif`, `--gbif-chave`,
+`--com-graficos`). O painel mostra o comando equivalente e pede confirmação.
+
+- O pipeline roda **separado do painel**: fechar o painel não o interrompe;
+  ao reabrir, o painel reencontra a rodada. O registro fica em
+  `resultados/logs/pipeline_<data>.log` e as últimas linhas aparecem na tela
+  (as barras de progresso viram linhas atualizadas a cada 3 s).
+- **Interromper**: o mesmo que Ctrl+C. A etapa atual para, o que já foi
+  gravado fica nos caches e as etapas seguintes não começam; depois, rode *a
+  partir* da etapa interrompida. No Linux/macOS, se não parar em 30 s,
+  aparece **Forçar**. No Windows não há como mandar Ctrl+C a um processo sem
+  janela: Interromper encerra o processo (perde só o item que estava em
+  leitura).
+- Uma rodada iniciada pelo **terminal** também é reconhecida: os botões de
+  rodar ficam bloqueados (duas rodadas gravariam nos mesmos caches) e
+  Interromper funciona (no Windows, encerrando o processo); o registro dela
+  fica no terminal.
+- **Antes de rodar**, o painel confere o `config/input.txt`, as credenciais do
+  GBIF (pelo painel o pipeline não tem como perguntar: se faltarem, a etapa 1
+  para com um aviso) e, para a etapa 5, se o Ollama está no ar.
+- **Exportar os gráficos** (Utilitários): roda o `graficos.py` com o formato
+  (PNG, SVG, PDF), a resolução e o tamanho dos rankings escolhidos.
+
+**Ollama e GPU.**
+
+- **Ollama**: se está no ar, a versão, se o modelo do `input.txt` está
+  baixado e, para o modelo carregado, **quanto dele está na GPU e quanto na
+  CPU** (parte na CPU = não coube na placa = leitura mais lenta). Botões:
+  **Iniciar o Ollama** (`ollama serve` em segundo plano; continua no ar se o
+  painel fechar; registro em `resultados/logs/ollama.log`), **Parar o
+  Ollama** (só o que o painel iniciou; um Ollama instalado como serviço do
+  sistema ou aberto na bandeja do Windows não é mexido) e **Baixar** o modelo
+  (`ollama pull`), se faltar. Variáveis como `OLLAMA_NUM_PARALLEL` valem se
+  estiverem no ambiente em que o painel foi aberto.
+- **GPU** (no lugar do `nvidia-smi -l 5`): temperatura, consumo, uso, clock e
+  memória de vídeo, lidos a cada 5 s, com gráficos dos últimos ~30 minutos e
+  aviso quando a temperatura passa de um limite (83 °C, ajustável). A barra
+  lateral mostra um resumo (por exemplo, `GPU 76 °C · 98% · 181 W`) em
+  qualquer página. Sem placa NVIDIA, o quadro só avisa.
+
+**Instalação.** Confere o Python (3.10+), os pacotes (`requests`, `pandas`,
+`tqdm`, `truststore`, `matplotlib`, `streamlit` e o `rdkit`, recomendado), o
+Ollama e o modelo, o `nvidia-smi`, o `config/input.txt`, as credenciais e se a
+pasta está organizada. **Instalar o que falta** roda o `pip` do mesmo Python
+do painel (precisa de internet). O Ollama não se instala pelo pip: o painel
+mostra o link.
 
 ### 20-A.3 Cuidados
 
@@ -2210,11 +2381,35 @@ o download traz todas.
 - Um composto conta como "ativo" em ensaio quando tem registro com pChEMBL
   igual ou acima do mínimo escolhido. Por padrão, só ensaios do **próprio**
   composto (sem estereoisômero nem previsão por similaridade).
+- Na aba **Sem compostos, com artigos da descoberta**, "sem compostos" quer dizer
+  sem composto **nas bases baixadas** (não que a planta não tenha química
+  publicada), e os artigos são os da etapa 2: o modelo não os leu. Os critérios
+  de atividade, evidência e pChEMBL da barra lateral não valem nessa aba; os
+  de distribuição valem.
+- Na aba **Leitura do modelo**, a lista vem do último diagnóstico (que leva
+  alguns minutos e roda sozinho na primeira vez; depois, pelo botão **Refazer o
+  diagnóstico**). Os totais por grupo descontam o que o modelo leu depois dele,
+  na ordem de leitura. O ritmo é medido enquanto o painel está aberto com a
+  etapa 5 rodando: a previsão só aparece depois de uns 10 minutos.
 - Planilhas muito grandes (milhões de linhas) demoram alguns segundos na
   primeira leitura; depois ficam em memória enquanto o painel estiver aberto.
 - Com `escopo = completo`, lembre-se de que a etapa 5 (PubMed) só leu as
   plantas da região: na **Prospecção**, uma planta de fora nunca terá artigo
   positivo, mesmo com o interruptor da região desligado.
+- **Como o painel sabe que a etapa 5 está rodando**: o pipeline não grava um
+  marcador, então o painel compara datas. A etapa está em andamento quando um
+  dos caches que só ela grava (`cache_llm_classificacao.jsonl`,
+  `cache_pubmed_filtro.jsonl`, `cache_pubchem_vinculos.jsonl`,
+  `cache_pubchem.jsonl`) é mais novo que o `especies_atividades.csv`, o último
+  arquivo que ela grava ao terminar. Uma rodada **interrompida** também conta
+  como em andamento, e é o certo: o resultado final dela ainda não existe.
+- Os parciais que o painel lê são uma **cópia** dos `*_parcial.csv`, numa
+  pasta temporária do sistema (fora do projeto), para nunca ler uma planilha
+  pela metade. O painel também grava os `*_parcial.csv` na raiz do projeto,
+  como o `mods/rodar.sh parcial`.
+- Gerar os parciais lê todos os caches da etapa 5: numa rodada grande, leva
+  alguns minutos e usa CPU e memória, ao lado do modelo que está rodando. Se
+  pesar, aumente o intervalo em **Configurações**.
 
 
 ---
@@ -2223,15 +2418,15 @@ o download traz todas.
 
 ## 21. Caches
 
-Cada linha de um arquivo `cache_*.jsonl` é uma consulta concluída. As
+Os caches ficam na pasta `cache/`. Cada linha de um arquivo `cache_*.jsonl` é uma consulta concluída. As
 chaves incluem a consulta exata (e, quando importa, o modelo e as
 atividades), de modo que mudar a configuração não reaproveita resultados
 errados: só o que mudou é refeito.
 
 | Cache | Etapa | Guarda | Apague para… |
 |---|---|---|---|
-| `dados_gbif_download/pedidos.json` | 1 | chave do pedido de cada região e do pedido em SQL dos estados (`SQL|estados_BR…`) | forçar um download novo do GBIF (ou apagar só a linha do SQL e o `especies_gbif_estados.csv` para refazer os estados) |
-| `dados_gbif_download/cache_nomes_populares.json` | 1 | nomes populares das espécies da região | atualizar os nomes populares |
+| `dados/gbif_download/pedidos.json` | 1 | chave do pedido de cada região e do pedido em SQL dos estados (`SQL|estados_BR…`) | forçar um download novo do GBIF (ou apagar só a linha do SQL e o `especies_gbif_estados.csv` para refazer os estados) |
+| `dados/gbif_download/cache_nomes_populares.json` | 1 | nomes populares das espécies da região | atualizar os nomes populares |
 | `cache_taxonomia_flora.jsonl`, `cache_taxonomia_wfo.jsonl`, `cache_taxonomia_gbif.jsonl` | 2 | veredito de cada base para cada nome | reconferir nomes (feito sozinho com `--atualizar-bases`) |
 | `cache_gbif_extras.jsonl` | 2 | ocorrências e nome popular das plantas da lista e dos artigos | atualizar esses dados |
 | `cache_openalex.jsonl` | 2 | buscas no OpenAlex | buscar artigos novos |
@@ -2290,17 +2485,20 @@ interromper).
 
 | Sintoma | Causa provável e solução |
 |---|---|
-| `./painel.sh`: `streamlit: command not found` ou erro ao instalar | a internet só é necessária na primeira vez; à mão: `.venv/bin/python -m pip install "streamlit>=1.50"` (Windows: `.venv\Scripts\python -m pip install "streamlit>=1.50"`) |
-| O painel abre sem dados ("Nenhuma planilha do pipeline nesta pasta") | o `painel.py` precisa estar na pasta do `rodar.sh`; ou indique a pasta em **Configurações → Pasta do projeto** |
-| `Port 8501 is already in use` | outro painel já está aberto: use a aba que já existe, ou `./painel.sh --server.port 8502` |
+| `mods/painel.sh`: `streamlit: command not found` ou erro ao instalar | a internet só é necessária na primeira vez; à mão: `.venv/bin/python -m pip install "streamlit>=1.50"` (Windows: `.venv\Scripts\python -m pip install "streamlit>=1.50"`) |
+| O painel abre sem dados ("Nenhuma planilha do pipeline nesta pasta") | o `painel.py` precisa estar na pasta do `mods/rodar.sh`; ou indique a pasta em **Configurações → Pasta do projeto** |
+| `Port 8501 is already in use` | outro painel já está aberto: use a aba que já existe, ou `mods/painel.sh --server.port 8502` |
 | O painel não mostra o resultado de uma rodada nova | **Configurações → Recarregar os dados** |
-| `Problema no arquivo de entrada…` | o erro indica a linha: vírgula decimal, latitude e longitude trocadas, chave com nome errado ou repetida. Rode `./rodar.sh config` |
+| O painel diz que a etapa 5 está em andamento, mas ela não está rodando | ela foi **interrompida** antes de gravar as planilhas finais (o painel compara datas, seção 20-A.3). Retome com `mods/rodar.sh --a-partir-de pubmed`; até lá, os parciais são o resultado disponível |
+| Os números da etapa 5 não mudam | olhe o quadro na barra lateral: se diz "Gerando parciais novos", a geração ainda não terminou (numa rodada grande leva vários minutos) e a página se refaz sozinha ao fim. "Na tela: parciais de …" diz de quando são os números mostrados |
+| O quadro da etapa 5 diz que a geração dos parciais falhou | ligue **Mostrar o registro da geração** no quadro. O mais comum é o painel ter sido aberto com um Python sem os pacotes do pipeline: abra-o pelo `mods/painel.sh` / `mods\painel.bat`, que usa o ambiente do pipeline |
+| `Problema no arquivo de entrada…` | o erro indica a linha: vírgula decimal, latitude e longitude trocadas, chave com nome errado ou repetida. Rode `mods/rodar.sh config` |
 | A etapa 1 pergunta se você já configurou as credenciais | falta o login do GBIF em `config/credenciais.txt`. Responda **n**, preencha no editor que abrir, salve |
 | `Credenciais do GBIF não configuradas…` e o pipeline para | rodando sem terminal, ele não pode perguntar. Preencha o `credenciais.txt` e rode de novo |
 | `GBIF recusou o login (HTTP 401)` | usuário ou senha errados (use o **usuário**, não o e-mail) |
 | O editor não abriu (Linux sem interface) | o pipeline usa `$EDITOR`, `nano` ou `vi`; se nenhum existir, edite o arquivo à mão |
-| `[FALHOU]` na etapa 0 | sem internet ou servidor fora. Rode `./rodar.sh --somente downloads` mais tarde ou faça o download manual (seção 12) |
-| `403 Client Error` ao baixar a Flora do Brasil | baixe pelo navegador em https://ipt.jbrj.gov.br/jbrj/archive.do?r=lista_especies_flora_brasil e salve como `dados_flora_brasil/flora_brasil_dwca.zip` |
+| `[FALHOU]` na etapa 0 | sem internet ou servidor fora. Rode `mods/rodar.sh --somente downloads` mais tarde ou faça o download manual (seção 12) |
+| `403 Client Error` ao baixar a Flora do Brasil | baixe pelo navegador em https://ipt.jbrj.gov.br/jbrj/archive.do?r=lista_especies_flora_brasil e salve como `dados/flora_brasil/flora_brasil_dwca.zip` |
 | `CERTIFICATE_VERIFY_FAILED` | o Python não confia no certificado do servidor. Confira se o `truststore` está instalado (`pip install truststore`), que faz o Python usar os certificados do sistema |
 | `ERRO: Ollama não está acessível` | inicie o Ollama (Linux: `sudo systemctl start ollama` ou `ollama serve`; Windows/macOS: abra o aplicativo) e rode `--a-partir-de pubmed` |
 | `modelo '…' não encontrado no Ollama` | `ollama pull qwen3.5:35b-a3b` (ou o modelo de `[ollama]`) |
@@ -2314,18 +2512,18 @@ interromper).
 | `GBIF não respondeu ao pedido (… HTTP 503)` | servidor do GBIF sobrecarregado. A etapa tenta de novo sozinha; se desistir, rode mais tarde ou use um download já feito: `--somente gbif --gbif-chave CHAVE` |
 | `Há download desta MESMA área com outro filtro de países` | o download antigo foi feito com outro `pais`. A etapa pede um novo; para usar o antigo: `--gbif-chave` com a chave mostrada |
 | `AVISO: estados do GBIF não obtidos (…)` | o pedido em SQL falhou (recurso experimental do GBIF) ou faltam as credenciais. A distribuição usa só a Flora; tente de novo com `--somente gbif` e depois `--somente plantas` |
-| FooDB: `o site recusou o download automático (HTTP 403)` | baixe pelo navegador (https://foodb.ca/downloads, o CSV) e ponha o arquivo em `dados_bioativos/` (qualquer nome começando por `foodb`, `.tar.gz` ou `.tar`); ou `usar_foodb = false` |
+| FooDB: `o site recusou o download automático (HTTP 403)` | baixe pelo navegador (https://foodb.ca/downloads, o CSV) e ponha o arquivo em `dados/bioativos/` (qualquer nome começando por `foodb`, `.tar.gz` ou `.tar`); ou `usar_foodb = false` |
 | `Conferência dos SMILES …: pulada (RDKit não instalado)` | rode o instalador de novo, ou `.venv/bin/python -m pip install rdkit` (Windows: `.venv\Scripts\python -m pip install rdkit`) |
 | `SMILES do PubChem` demora na 1ª rodada | os compostos sem CID são consultados um a um (podem ser muitas horas); tudo fica em cache, e uma rodada interrompida continua de onde parou. Para pular: `smiles_pubchem = false` em `[bioativos]` |
 | `TypeError: Invalid value for dtype 'str'` na etapa `bioativos` | versão 3.11 com pandas 3: corrigido na 3.12. As consultas já feitas ao PubChem estão no cache; rode `--somente bioativos` de novo |
-| Linux: `Permission denied` em `./rodar.sh` | `chmod +x rodar.sh instalar.sh`, ou `bash rodar.sh` |
-| Linux: `externally-managed-environment` | use o `./instalar.sh` (cria o `.venv`); se faltar o venv: `sudo apt install python3-venv` |
-| Linux: `bash\r: No such file or directory` | o arquivo foi salvo com quebras de linha do Windows: `sed -i 's/\r$//' rodar.sh instalar.sh` |
+| Linux: `Permission denied` em `mods/rodar.sh` | `chmod +x mods/rodar.sh mods/instalar.sh`, ou `bash mods/rodar.sh` |
+| Linux: `externally-managed-environment` | use o `mods/instalar.sh` (cria o `.venv`); se faltar o venv: `sudo apt install python3-venv` |
+| Linux: `bash\r: No such file or directory` | o arquivo foi salvo com quebras de linha do Windows: `sed -i 's/\r$//' mods/rodar.sh mods/instalar.sh` |
 | Linux: o pipeline parou ao fechar o terminal | use `tmux` ou `nohup` (seção 10.4) |
-| `ERRO: matplotlib não encontrado` | rode o instalador de novo, ou pelo `./graficos.sh` / `graficos.bat`, que o instala; à mão: `.venv/bin/python -m pip install matplotlib` (Windows: `.venv\Scripts\python -m pip install matplotlib`) |
-| `./graficos.sh` falha ao instalar o matplotlib | a internet só é necessária na primeira vez; atrás de proxy, instale à mão com o comando acima |
-| `AVISO: gráficos da etapa ... não gerados - falta o matplotlib` | instalação anterior à 3.7: rode o `instalar.sh` / `instalar.bat` de novo (não apaga nada) |
-| `Permission denied` em `./graficos.sh` | `chmod +x graficos.sh`, ou `bash graficos.sh` |
+| `ERRO: matplotlib não encontrado` | rode o instalador de novo, ou pelo `mods/graficos.sh` / `mods\graficos.bat`, que o instala; à mão: `.venv/bin/python -m pip install matplotlib` (Windows: `.venv\Scripts\python -m pip install matplotlib`) |
+| `mods/graficos.sh` falha ao instalar o matplotlib | a internet só é necessária na primeira vez; atrás de proxy, instale à mão com o comando acima |
+| `AVISO: gráficos da etapa ... não gerados - falta o matplotlib` | instalação anterior à 3.7: rode o `mods/instalar.sh` / `mods\instalar.bat` de novo (não apaga nada) |
+| `Permission denied` em `mods/graficos.sh` | `chmod +x mods/graficos.sh`, ou `bash mods/graficos.sh` |
 | Um gráfico esperado não aparece | a etapa dele não terminou ou a coluna está vazia: o aviso aparece na tela e no topo da etapa, no relatório |
 | O relatório abre sem as imagens | o `relatorio.html` procura as imagens na mesma pasta: copie a pasta `graficos/` inteira, não só o HTML |
 | `erro ao gerar os gráficos desta etapa` no relatório | em geral, uma planilha foi aberta e salva noutro formato (ex.: no Excel, com `;`). Rode a etapa de novo para regravá-la; as outras etapas não são afetadas |
@@ -2394,10 +2592,10 @@ interromper).
 Ao publicar resultados:
 - **GBIF**: cite o **DOI de cada download** (o da região e, se usado, o da
   tabela de estados). Eles aparecem no site do GBIF, em *Downloads* da sua
-  conta; as chaves estão em `dados_gbif_download/pedidos.json`.
+  conta; as chaves estão em `dados/gbif_download/pedidos.json`.
 - **Demais bases**: cite a publicação de referência indicada no site de
-  cada uma e a versão usada (COCONUT: `dados_bioativos/coconut_versao.txt`;
-  LOTUS: `dados_bioativos/lotus_versao.txt`; ChEMBL: nome do arquivo
+  cada uma e a versão usada (COCONUT: `dados/bioativos/coconut_versao.txt`;
+  LOTUS: `dados/bioativos/lotus_versao.txt`; ChEMBL: nome do arquivo
   baixado).
 
 ---
@@ -2463,7 +2661,7 @@ FONTE = {
 }
 
 def baixar() -> None:
-    """Garante os arquivos em dados_bioativos/. Pode ficar vazia (base por API)."""
+    """Garante os arquivos em dados/bioativos/. Pode ficar vazia (base por API)."""
 
 def cruzar(casar, especies, generos) -> pandas.DataFrame:
     ...
@@ -2518,7 +2716,7 @@ cd mods && python3 -c "import espectros; print(espectros.resumo())"
 Rode só a etapa do banco:
 
 ```bash
-./rodar.sh --somente banco
+mods/rodar.sh --somente banco
 ```
 
 A tela mostra uma linha por fonte, com quantos registros cada uma trouxe.
@@ -2661,8 +2859,8 @@ confira:
 md5sum mods/cruzar_especies_bioativos.py mods/gerar_banco.py \
        mods/esquema_banco.py mods/config_pipeline.py > antes.md5
 # crie o módulo da fonte, ligue a chave e rode a etapa
-#   compostos: ./rodar.sh --somente bioativos
-#   espectros: ./rodar.sh --somente banco
+#   compostos: mods/rodar.sh --somente bioativos
+#   espectros: mods/rodar.sh --somente banco
 md5sum -c antes.md5
 ```
 
@@ -2686,7 +2884,50 @@ licença do agregado é limitada pela fonte mais restritiva.
 
 ## 27. Histórico de mudanças
 
-### Versão 3.20 (atual): `banco/` inteiramente em inglês e ClassyFire por padrão
+### Etapa 5: plantas citadas em artigos da descoberta (para a versão 3.20)
+
+| Antes | Agora |
+|---|---|
+| Com `plantas_pesquisadas = com_compostos`, plantas sem compostos nas bases ficavam fora da etapa 5, mesmo citadas em artigos da região com termo de atividade (ex.: *Endopleura uchi*, 6 artigos) | essas plantas entram na busca, **sem mudar o `input.txt`**, e são lidas junto com as outras plantas, antes dos compostos |
+| Não havia como saber o que o modelo ainda tinha por ler (numa planta com positivo, a planilha não mostra os artigos pendentes) | novo `diagnostico_leitura.py` (na pasta do `mods/rodar.sh`) e aba **Leitura do modelo** na página 5 · PubMed do painel: pares lidos e por ler por grupo, ritmo, previsão de término e a lista de quem tem artigo por ler |
+| Os artigos da descoberta (etapa 2) só serviam para anotar `atividades_artigos` | o modelo também lê esses artigos (os com PMID e termo de atividade), para todas as plantas pesquisadas; `via_busca = descoberta` |
+| Painel: links da lista de artigos da descoberta | corrigidos para o formato `PMID ...`, `DOI ...`, `OpenAlex ...` |
+
+Para aplicar numa rodada em andamento ou concluída: `mods/rodar.sh --a-partir-de pubmed`
+(Windows: `mods\rodar.bat --a-partir-de pubmed`). Tudo o que já foi lido está no cache
+e não é lido de novo.
+
+### Versão 3.22: Ollama com pedidos simultâneos por padrão
+
+| Antes | Agora |
+|---|---|
+| O `ollama serve` iniciado pelo painel ficava com `OLLAMA_NUM_PARALLEL` = 1: os 4 pedidos de `paralelo = 4` esperavam na fila, e a leitura saía a ~2 s por par | painel e etapa 5 iniciam o Ollama com `OLLAMA_NUM_PARALLEL` = `[ollama] paralelo` |
+| Com o Ollama fora do ar, a etapa 5 parava com erro | a etapa 5 inicia o Ollama local sozinha (se o comando `ollama` existir) |
+| Nada indicava que o paralelo não estava valendo | no Linux, a etapa 5 avisa quando o Ollama em execução aceita menos pedidos simultâneos que o `paralelo` |
+| | Limitação: com `qwen3.5:35b-a3b`, o Ollama 0.40.13 ignora `OLLAMA_NUM_PARALLEL` (arquitetura `qwen35moe` sem pedidos simultâneos; seção 17) |
+
+### Versão 3.21: pasta organizada e painel que roda o pipeline
+
+| Antes | Agora |
+|---|---|
+| Caches, planilhas, bases e lançadores soltos na raiz | `config/`, `mods/` (programas e lançadores), `dados/`, `cache/` e `resultados/` (seção 5); `mods/organizar_pasta.sh` passa uma pasta antiga para o formato novo, sem apagar nada (seção 5.1) |
+| Comandos `./rodar.sh`, `./painel.sh`... na raiz | `mods/rodar.sh`, `mods/painel.sh`... (Windows: `mods\rodar.bat`...), rodados da pasta do projeto |
+| O painel só era aberto pelo terminal | ícone "Painel do pipeline" para Linux e Windows (`mods/painel.sh atalho`), que abre sem terminal e reaproveita o painel já aberto; botão **Fechar o painel** |
+| Rodar, interromper e acompanhar só pelo terminal; `ollama serve` e `nvidia-smi -l 5` em terminais à parte | página **Rodar o pipeline**: etapas e opções, Interromper, registro na tela; Ollama (iniciar, parar, baixar o modelo, quanto do modelo está na GPU); GPU (temperatura, consumo, uso, memória, com gráficos e aviso de temperatura); instalação (confere e instala o que falta) (seção 20-A.4) |
+| Gráficos gerados ao fim das etapas 2 a 5 | desligado por padrão (`[graficos]` `automatico = sim` ou `--com-graficos` liga); exportação pelo painel (Utilitários) ou `mods/graficos.sh` |
+| Etapa 5: as plantas sem compostos citadas na descoberta eram lidas depois dos compostos | todas as plantas são lidas antes dos compostos |
+| As páginas 2 · Plantas e 3 · Compostos não usavam a etapa 5 | colunas artigos positivos, atividades (PubMed), melhor evidência e situação na etapa 5; filtros por situação, atividade e evidência; métrica "com artigo positivo" |
+
+### Painel: resultados parciais automáticos (para a versão 3.20)
+
+| Antes | Agora |
+|---|---|
+| Com a etapa 5 rodando, era preciso rodar `mods/rodar.sh parcial` e ligar **Modo parcial** no painel | o painel percebe sozinho que a etapa 5 está em andamento e gera os parciais em segundo plano: **sempre que é aberto** e, depois, quando o modelo leu algo novo (no máximo a cada 10 minutos, ajustável), com um quadro de andamento na barra lateral e o botão **Atualizar os parciais agora** |
+| O banco de uma rodada anterior aparecia junto com a etapa 5 em andamento | banco e qualidade (etapas 6 a 8) só com a etapa 5 concluída. Se o banco for mais antigo que a última etapa 5, a página avisa e indica `--a-partir-de normalizacao` |
+| Erro na página do Banco quando existia `dicionario_dados.csv` | corrigido |
+| Plantas sem compostos nas bases da etapa 3 (que, com `plantas_pesquisadas = com_compostos`, a etapa 5 não pesquisa) não apareciam na Prospecção | aba **Sem compostos, com artigos da descoberta** na Prospecção: lista essas plantas com os artigos da etapa 2 que as citam. **O modelo não leu esses artigos**: indicam o tema, não confirmam a atividade. Útil para achar química pouco explorada (ex.: *Endopleura uchi*, com bergenina publicada, mas ausente das bases) |
+
+### Versão 3.20: `banco/` inteiramente em inglês e ClassyFire por padrão
 
 | Antes | Agora |
 |---|---|
@@ -2722,7 +2963,7 @@ licença do agregado é limitada pela fonte mais restritiva.
 | — | `organisms.csv` e `compounds_biological_origin.csv` ganharam `in_region` (`yes`/`no`) |
 
 | A camada espectral do banco era código dentro da etapa `banco` | virou **ponto de extensão**: `mods/espectros.py` descobre as fontes em `mods/espectros_<nome>.py`, e o PubChem e os m/z teóricos do RDKit passaram a ser duas fontes registradas. Acrescentar o GNPS, o MassBank ou o MoNA é criar um módulo — nenhum arquivo existente muda, e a chave `[banco] espectros_<nome>` passa a ser aceita sozinha. Guia na seção 26, modelo comentado em `mods/espectros_exemplo.py` (seção 17-A.4) |
-| Resultados só em planilhas e no relatório de gráficos | **painel interativo** `painel.py` (Streamlit), com os lançadores `painel.sh` / `painel.bat`: uma página por etapa, com filtros e download do recorte; **Prospecção** (plantas candidatas cruzando atividade na planta, compostos ativos em artigos e ensaios, evidência, coleta e distribuição); **Ficha** de planta e de composto; banco, ADMET, conflitos e qualidade (seção 20-A). Lê o banco em inglês ou em português, respeita o interruptor *Só as plantas da região* e funciona com etapas faltando e com o modo parcial da etapa 5 |
+| Resultados só em planilhas e no relatório de gráficos | **painel interativo** `painel.py` (Streamlit), com os lançadores `mods/painel.sh` / `mods\painel.bat`: uma página por etapa, com filtros e download do recorte; **Prospecção** (plantas candidatas cruzando atividade na planta, compostos ativos em artigos e ensaios, evidência, coleta e distribuição); **Ficha** de planta e de composto; banco, ADMET, conflitos e qualidade (seção 20-A). Lê o banco em inglês ou em português, respeita o interruptor *Só as plantas da região* e funciona com etapas faltando e com o modo parcial da etapa 5 |
 
 > As planilhas da v3.17 continuam servindo: sem a coluna `na_regiao`, tudo se
 > comporta como `escopo = regiao`. Para passar ao escopo completo, rode
@@ -2806,7 +3047,7 @@ cada base de origem.
 | Sem credenciais do GBIF, o pedido em SQL dos estados (opcional) derrubava a etapa `gbif` inteira | vira só um aviso; a etapa termina normalmente |
 | O pedido em SQL repetia 4 tentativas, com pausas de até 3 min, quando o GBIF não respondia | 2 tentativas: é opcional e é refeito na próxima rodada |
 | Um SMILES inválido de uma fonte podia virar o `composto_smiles` (quando era a única com estrutura, ou a primeira na ordem) | com o RDKit, o SMILES de cada fonte é validado: o inválido é pulado em favor da próxima fonte válida e marcado em `conferencia_smiles` (`SMILES inválido: LOTUS`) |
-| Mensagens do `graficos.py` mostravam só comandos do Linux | mostram `rodar.bat` / `graficos.bat` no Windows |
+| Mensagens do `graficos.py` mostravam só comandos do Linux | mostram `mods\rodar.bat` / `mods\graficos.bat` no Windows |
 | README com trechos de versões anteriores (nomes "intactos", modelo na etapa `plantas`, exemplo de sinônimos em duas linhas) | revisado: distribuição por estado, SMILES por fonte, gráficos automáticos, novas mensagens em *Solução de problemas*, limitações e bases (GADM, RDKit) |
 
 ### Versão 3.10: estados também pelo GBIF
@@ -2841,10 +3082,10 @@ cada base de origem.
 
 | Antes | Agora |
 |---|---|
-| Os gráficos só eram gerados rodando `./graficos.sh` à parte | o pipeline gera os gráficos ao terminar as etapas `plantas`, `bioativos`, `chembl` e `pubmed` (a etapa e a visão geral) e atualiza `graficos/relatorio.html`; `--sem-graficos` desliga |
-| Rodar `./graficos.sh --etapas X` deixava no relatório só a etapa X | o relatório acumula: as etapas não refeitas continuam nele, com os gráficos anteriores (`graficos/dados/_relatorio.json`) |
-| O `matplotlib` era instalado pelo `graficos.sh` na primeira vez | entra no `requirements.txt` e é instalado pelo `instalar.sh` / `instalar.bat` |
-| `graficos.sh` / `graficos.bat` só conheciam a `.venv` | reconhecem também a `.venv-linux` / `.venv-win` (pasta compartilhada entre sistemas) |
+| Os gráficos só eram gerados rodando `mods/graficos.sh` à parte | o pipeline gera os gráficos ao terminar as etapas `plantas`, `bioativos`, `chembl` e `pubmed` (a etapa e a visão geral) e atualiza `resultados/graficos/relatorio.html`; `--sem-graficos` desliga |
+| Rodar `mods/graficos.sh --etapas X` deixava no relatório só a etapa X | o relatório acumula: as etapas não refeitas continuam nele, com os gráficos anteriores (`graficos/dados/_relatorio.json`) |
+| O `matplotlib` era instalado pelo `mods/graficos.sh` na primeira vez | entra no `requirements.txt` e é instalado pelo `mods/instalar.sh` / `mods\instalar.bat` |
+| `mods/graficos.sh` / `mods\graficos.bat` só conheciam a `.venv` | reconhecem também a `.venv-linux` / `.venv-win` (pasta compartilhada entre sistemas) |
 
 ### Versão 3.6: Windows e Linux
 
@@ -2852,11 +3093,11 @@ cada base de origem.
 |---|---|
 | No Windows, um CSV aberto no Excel durante a gravação derrubava a etapa (`PermissionError`) | a etapa avisa ("feche o arquivo") e continua sozinha quando ele é liberado |
 | Pastas com arquivos somente leitura (comum no Windows) não eram apagadas ao atualizar uma base | apagadas mesmo assim; se algum arquivo estiver aberto, a mensagem diz qual pasta |
-| Mensagens mandavam usar `GBIF_DOWNLOAD_KEY=... ./rodar.sh`, sintaxe que não existe no Windows | opção `--gbif-chave`, igual nos dois sistemas; as mensagens mostram `rodar.bat` ou `./rodar.sh` conforme o sistema |
+| Mensagens mandavam usar `GBIF_DOWNLOAD_KEY=... mods/rodar.sh`, sintaxe que não existe no Windows | opção `--gbif-chave`, igual nos dois sistemas; as mensagens mostram `mods\rodar.bat` ou `mods/rodar.sh` conforme o sistema |
 | Com `--gbif-chave` e o zip já baixado, a etapa ainda esperava o GBIF responder | usa o zip local direto |
 | Com o GBIF fora do ar, nomes populares, ocorrências e conferência de nomes esperavam por cada uma de milhares de consultas (horas) | depois de várias falhas seguidas, a etapa para de consultar e segue; o que faltou é buscado na próxima rodada |
 | Uma falha de rede ao buscar o nome popular ficava gravada no cache como "sem nome popular" | falhas não vão para o cache |
-| `instalar.bat` não conferia a versão do Python, caía no atalho falso da Microsoft Store e dizia "Pronto" mesmo com erro no `pip` | usa o lançador `py` quando existe, exige Python 3.10+, explica o atalho da Store e para com mensagem clara se o `pip` falhar |
+| `mods\instalar.bat` não conferia a versão do Python, caía no atalho falso da Microsoft Store e dizia "Pronto" mesmo com erro no `pip` | usa o lançador `py` quando existe, exige Python 3.10+, explica o atalho da Store e para com mensagem clara se o `pip` falhar |
 | A mesma pasta usada no Windows e no Linux: o `.venv` de um sistema estragava o do outro | `.venv-win` / `.venv-linux` quando necessário |
 | Saída redirecionada para arquivo no Windows (`> log.txt`) podia quebrar com nomes como "(1→2)" | a saída é sempre UTF-8, e um caractere impossível vira "?" em vez de erro |
 
@@ -2867,20 +3108,20 @@ cada base de origem.
 | Se o GBIF demorasse mais de 60 s para aceitar o pedido de download (comum com polígonos grandes), a etapa `gbif` parava com erro | espera até 5 min; sem resposta, confere nos pedidos recentes da sua conta se o pedido foi criado mesmo assim (evita pedidos duplicados) e tenta de novo até 4 vezes |
 | O GBIF sobrecarregado (HTTP 503 "Backend fetch failed" ou 429) interrompia a etapa | tratado como lentidão: confere se o pedido foi criado e tenta de novo |
 | Um pedido da mesma área escrito com outra precisão de coordenadas não era reconhecido | a região é comparada pelas coordenadas; se só houver download da mesma área com outro filtro de países, a etapa avisa e mostra a chave |
-| Com o GBIF fora do ar, o pedido anterior da região era ignorado e um novo era aberto | o pedido anterior é reaproveitado; se o arquivo dele já estiver em `dados_gbif_download/`, nem consulta o GBIF |
-| O FooDB recusava o download automático (HTTP 403) sem dizer o que fazer | o download imita um navegador; se ainda for recusado, a mensagem diz onde salvar o arquivo baixado à mão (`dados_bioativos/foodb_csv.tar.gz`) |
+| Com o GBIF fora do ar, o pedido anterior da região era ignorado e um novo era aberto | o pedido anterior é reaproveitado; se o arquivo dele já estiver em `dados/gbif_download/`, nem consulta o GBIF |
+| O FooDB recusava o download automático (HTTP 403) sem dizer o que fazer | o download imita um navegador; se ainda for recusado, a mensagem diz onde salvar o arquivo baixado à mão (`dados/bioativos/foodb_csv.tar.gz`) |
 
 ### Gráficos (para as versões 3 a 3.4)
 
 | Mudança | Detalhe |
 |---|---|
-| Gráficos dos resultados | `graficos.py`, com os lançadores `graficos.sh` / `graficos.bat`: cerca de 40 gráficos, da visão geral à etapa 5, num relatório `graficos/relatorio.html`, com a tabela de cada gráfico em `graficos/dados/` (seção 20) |
+| Gráficos dos resultados | `graficos.py`, com os lançadores `mods/graficos.sh` / `mods\graficos.bat`: cerca de 40 gráficos, da visão geral à etapa 5, num relatório `resultados/graficos/relatorio.html`, com a tabela de cada gráfico em `graficos/dados/` (seção 20) |
 | Nomes não reconhecidos em destaque | no gráfico *Plantas mais citadas nos artigos*, os nomes `não reconhecido` aparecem em cinza, com legenda; a tabela do gráfico traz a coluna `situacao_nome` |
 | Compatível com a versão 3.1 | lê as colunas novas (`nome_aceito`, `linha_em_plantas_csv`), o WCVP nos vereditos, as situações novas (`sinônimo`, `grafia variante`, `homônimo ambíguo`, nomes da lista mantidos) e o `plantas_descartados.csv`, com dois gráficos novos. As saídas da versão 3 continuam sendo lidas |
 | Compatível com a versão 3.2 | com `[termos_pubmed]` vazia, a anotação "atividade biológica (geral)" vira o gráfico das plantas com mais artigos sobre atividade biológica |
 | Compatível com a versão 3.3 | a situação nova "aceito (nas fontes só sinônimo ou grafia variante)" aparece no gráfico *Situação dos nomes*; o relatório passa a mostrar quantas linhas reúnem vários nomes (`nomes_juntados`) |
 | Versão 3.4 | sem mudança de formato: os gráficos leem as saídas como estão; os nomes de compostos corrigidos e completados pela 3.4 aparecem nos rankings (nomes IUPAC longos são abreviados com "…") |
-| Pipeline inalterado | os gráficos só leem as planilhas e o cache do modelo; nenhum script de `mods/` mudou. O `matplotlib` é instalado no `.venv` pelo próprio `graficos.sh` |
+| Pipeline inalterado | os gráficos só leem as planilhas e o cache do modelo; nenhum script de `mods/` mudou. O `matplotlib` é instalado no `.venv` pelo próprio `mods/graficos.sh` |
 
 ### Versão 3.4: depuração
 
@@ -2933,7 +3174,7 @@ ajustadas.
 (`pais` em `[regiao]`; `usar_wcvp` e `wcvp_url` em `[taxonomia]`) têm valor
 padrão. Para usar a versão nova, rode a etapa `downloads` (baixa o WCVP) e
 refaça a partir de `plantas` (ou de `gbif`, se acrescentar `pais`):
-`./rodar.sh --somente downloads` e `./rodar.sh --a-partir-de plantas
+`mods/rodar.sh --somente downloads` e `mods/rodar.sh --a-partir-de plantas
 --pular-downloads`.
 
 Os caches da conferência de nomes feitos com as regras antigas não são
@@ -2949,12 +3190,12 @@ consultadas de novo. Depois, rode a partir da etapa `plantas`
 | Cinco bases de compostos | além do COCONUT e do NPASS: Dr. Duke (parte da planta, teor, atividades), LOTUS (DOI de cada par) e FooDB (alimento e teor) |
 | Novas colunas de síntese | `bases_compostos` (plantas); `bases`, `atividades_duke`, `referencias_lotus` (compostos) |
 | Pastas organizadas | `mods/` para os scripts, `config/` para a configuração |
-| Linux, Windows e macOS | instaladores com ambiente virtual, lançadores `rodar.sh`/`rodar.bat`, leitura de arquivos salvos no Windows |
+| Linux, Windows e macOS | instaladores com ambiente virtual, lançadores `mods/rodar.sh`/`mods\rodar.bat`, leitura de arquivos salvos no Windows |
 | Credenciais | um só `config/credenciais.txt` para todos os sistemas; o pipeline pergunta e abre o arquivo se faltar o login do GBIF |
 | Lista de plantas em arquivo | `config/lista_de_plantas.txt` substitui `[taxons]` |
 | Descoberta em artigos pela região | só os termos da região buscam; as atividades apenas anotam; contexto vegetal opcional; busca dividida por ano acima de 10 mil artigos |
 | Etapa 5 mais rápida | PubChem em lotes; pré-checagem com todas as atividades juntas; plantas lidas pelo modelo antes dos compostos |
-| Acompanhamento | `./rodar.sh parcial` (sem internet, em arquivos `*_parcial.csv`) e `./rodar.sh diagnostico` |
+| Acompanhamento | `mods/rodar.sh parcial` (sem internet, em arquivos `*_parcial.csv`) e `mods/rodar.sh diagnostico` |
 | Robustez | gravação atômica das planilhas e das extrações; falhas de rede não viram "nenhum artigo"; cache dos nomes populares do GBIF; espera do GBIF tolerante a falhas passageiras |
 
 ### Versão 2

@@ -1,0 +1,20 @@
+# =============================================================================
+# credenciais.txt - credenciais do pipeline (Windows, Linux e macOS)
+# =============================================================================
+# Preencha depois do "=", sem aspas, e salve o arquivo.
+# NÃO compartilhe este arquivo: as senhas ficam em texto puro.
+#
+# GBIF (obrigatório só quando o pipeline pede um download novo ao GBIF, ou
+# seja, na 1ª vez ou quando a região muda). Conta gratuita:
+# https://www.gbif.org -> Login -> Register
+GBIF_USER =
+GBIF_PWD =
+GBIF_EMAIL =
+
+# NCBI (opcional, deixa o PubMed/PubChem ~3x mais rápido). Chave gratuita:
+# https://www.ncbi.nlm.nih.gov/account/ -> Account settings -> API Key
+NCBI_API_KEY =
+
+# OpenAlex (opcional, para a descoberta de plantas em artigos). Chave gratuita:
+# https://openalex.org -> criar conta
+OPENALEX_API_KEY =

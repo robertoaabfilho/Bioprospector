@@ -1,0 +1,13 @@
+requests>=2.28
+pandas>=1.5
+tqdm>=4.60
+truststore>=0.9
+matplotlib>=3.6
+
+# Opcional, só para o painel interativo (./painel.sh): o próprio lançador o
+# instala na primeira vez. Descomente para instalar junto com o resto.
+# streamlit>=1.50
+
+# Opcional, para a projeção UMAP do espaço químico na etapa "qualidade"
+# ([banco] umap). Sem ele, a etapa avisa e segue sem a projeção.
+# umap-learn>=0.5.6
