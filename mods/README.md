@@ -1,6 +1,6 @@
 # Pipeline de prospecção de plantas e compostos bioativos
 
-> **Versão 3.22** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
+> **Versão 3.23** · roda em Linux, Windows e macOS · Python 3.10+ · modelo local via Ollama (Qwen 3.5)
 >
 > Você informa uma **região**, uma **lista de plantas** e as **atividades
 > biológicas** que interessam. O pipeline devolve planilhas com as plantas, os
@@ -1700,7 +1700,8 @@ simultâneos (`OLLAMA_NUM_PARALLEL`):
 - **Ollama que já estava rodando**: no Linux, a etapa 5 confere quantos
   pedidos simultâneos ele aceita e avisa (`AVISO: [ollama] paralelo = 4, mas
   o Ollama em execução aceita só 1...`). Pare-o e rode a etapa de novo, ou
-  configure como abaixo.
+  configure como abaixo. No Windows e no macOS não dá para conferir de fora:
+  defina a variável como abaixo.
 - **Linux** (Ollama como serviço): `sudo systemctl edit ollama`, acrescente
   ```
   [Service]
@@ -2355,8 +2356,16 @@ Página **Rodar o pipeline**, com três abas.
   painel fechar; registro em `resultados/logs/ollama.log`), **Parar o
   Ollama** (só o que o painel iniciou; um Ollama instalado como serviço do
   sistema ou aberto na bandeja do Windows não é mexido) e **Baixar** o modelo
-  (`ollama pull`), se faltar. Variáveis como `OLLAMA_NUM_PARALLEL` valem se
-  estiverem no ambiente em que o painel foi aberto.
+  (`ollama pull`), se faltar. O Ollama é procurado no PATH e no local
+  padrão de instalação (Windows: `%LOCALAPPDATA%\Programs\Ollama`). O
+  *Iniciar o Ollama* sobe com
+  `OLLAMA_NUM_PARALLEL` igual ao `paralelo` do `input.txt` (se a variável
+  já estiver no ambiente em que o painel foi aberto, vale a do ambiente).
+  **Pedidos simultâneos**: uma linha mostra o `paralelo` pedido, o
+  `OLLAMA_NUM_PARALLEL` com que o Ollama subiu e quantas vagas o modelo
+  carregado abriu (lidos do `ollama.log`), com aviso quando o paralelo não
+  está valendo, por exemplo com o `qwen3.5:35b-a3b`, cuja arquitetura o
+  Ollama ainda lê um resumo por vez (seção 17).
 - **GPU** (no lugar do `nvidia-smi -l 5`): temperatura, consumo, uso, clock e
   memória de vídeo, lidos a cada 5 s, com gráficos dos últimos ~30 minutos e
   aviso quando a temperatura passa de um limite (83 °C, ajustável). A barra
@@ -2558,7 +2567,12 @@ interromper).
   escrita de várias formas; compare pela coluna `conferencia_smiles`, que
   compara as estruturas. "Estruturas diferentes" aponta os casos a conferir.
 - **A via InChIKey** depende dos vínculos do PubChem; muitos produtos
-  naturais raros não têm nenhum (por isso existe a busca pelo nome).
+  naturais raros não têm nenhum (por isso existe a busca pelo nome). No
+  outro extremo, substâncias muito comuns (ácido acético, glicose...) têm
+  dezenas de milhares de artigos ligados; o pipeline consulta os vínculos
+  em lotes de 100 CIDs e, quando a resposta de um lote é grande demais e
+  vem cortada pelo NCBI, divide o lote ao meio até dar certo (o registro
+  mostra `N lote(s) com resposta grande demais ... foram divididos`).
 - **Estereoisômeros e previsões** do ChEMBL são indicativos, não dados do
   próprio composto.
 - **As bases de compostos** registram o que foi publicado: a falta de
@@ -2896,6 +2910,17 @@ licença do agregado é limitada pela fonte mais restritiva.
 Para aplicar numa rodada em andamento ou concluída: `mods/rodar.sh --a-partir-de pubmed`
 (Windows: `mods\rodar.bat --a-partir-de pubmed`). Tudo o que já foi lido está no cache
 e não é lido de novo.
+
+### Versão 3.23: vínculos do PubChem completos e paralelo visível no painel
+
+| Antes | Agora |
+|---|---|
+| Lotes de vínculos PubChem → PubMed com substâncias muito citadas (ácido acético, ~40 mil artigos) vinham cortados pelo NCBI (`elink falhou (Response ended prematurely)`); as mesmas ~850 substâncias falhavam em toda execução e nunca entravam na via InChIKey | lote com resposta cortada é dividido ao meio até dar certo; só falha de verdade (servidor fora do ar) conta para o disjuntor e fica para a próxima execução |
+| O painel não mostrava se o `paralelo` estava valendo | aba **Ollama e GPU**: linha *Pedidos simultâneos* (pedido no `input.txt`, `OLLAMA_NUM_PARALLEL` do Ollama, vagas do modelo carregado) e aviso quando a arquitetura do modelo recusa pedidos simultâneos |
+| No Windows, a etapa 5 só achava o Ollama se ele estivesse no PATH | painel e etapa 5 usam a mesma busca: PATH ou o local padrão de instalação (Windows: `%LOCALAPPDATA%\Programs\Ollama\ollama.exe`; macOS: Homebrew e `Ollama.app`) |
+| Com o Ollama da bandeja do Windows (ou um serviço do sistema), o painel podia mostrar o paralelo de um `ollama.log` antigo | o `ollama.log` só é usado quando o Ollama em execução foi iniciado pelo painel ou pelo pipeline; senão, o painel explica que não dá para conferir e como definir `OLLAMA_NUM_PARALLEL` |
+| Se o `ollama.log` estivesse preso por um Ollama antigo (Windows), iniciar o Ollama pela etapa 5 quebrava a etapa | a etapa avisa e segue para a mensagem de como iniciar o Ollama |
+| Avisos da checagem estática (`pyflakes`): imports sem uso, f-string sem variável | código limpo |
 
 ### Versão 3.22: Ollama com pedidos simultâneos por padrão
 

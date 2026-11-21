@@ -2446,7 +2446,6 @@ def pagina_banco():
 # Rodar o pipeline, Ollama, GPU e instalação
 # =============================================================================
 import json
-import shutil
 import urllib.request
 from collections import deque
 
@@ -2726,15 +2725,7 @@ def _ollama_api(caminho: str, timeout: float = 2.0) -> dict | None:
 
 
 def ollama_bin() -> str | None:
-    b = shutil.which("ollama")
-    if b:
-        return b
-    for c in ([Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"]
-              if os.name == "nt" else [Path("/usr/local/bin/ollama"), Path("/usr/bin/ollama"),
-                                       Path.home() / ".local" / "bin" / "ollama"]):
-        if c.exists():
-            return str(c)
-    return None
+    return _P().ollama_bin()
 
 
 def ollama_info() -> dict:
@@ -2759,6 +2750,67 @@ def ollama_do_painel() -> int | None:
     return pid if _P().vivo(pid) else None
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def paralelo_ollama_log(caminho: str, _mtime: float) -> dict:
+    """Pedidos simultâneos de fato, lidos do começo do ollama.log (o Ollama
+    registra a configuração e o carregamento do modelo ao iniciar; o arquivo é
+    recriado a cada início): OLLAMA_NUM_PARALLEL, quantas vagas (slots) o
+    modelo abriu e se a arquitetura recusou pedidos simultâneos."""
+    try:
+        with open(caminho, "rb") as f:
+            texto = f.read(4_000_000).decode("utf-8", "replace")
+    except OSError:
+        return {}
+    info = {}
+    m = re.findall(r"OLLAMA_NUM_PARALLEL:(\d+)", texto)
+    if m:
+        info["num_parallel"] = int(m[-1])
+    m = re.findall(r"n_slots = (\d+)", texto)
+    if m:
+        info["slots"] = int(m[-1])
+    m = re.findall(r"does not currently support parallel requests\"? architecture=(\S+)", texto)
+    if m:
+        info["recusa"] = m[-1].strip('"')
+    return info
+
+
+def quadro_paralelo(cfg: dict):
+    """Uma linha sobre os pedidos simultâneos: o que o input.txt pede e o que o
+    Ollama de fato atende."""
+    try:
+        pedido = max(1, int(cfg.get("paralelo") or 1))
+    except ValueError:
+        pedido = 1
+    log = pasta_logs() / "ollama.log"
+    # o ollama.log só descreve o Ollama em execução se foi o painel ou o pipeline
+    # que o iniciou (senão - serviço do sistema, bandeja do Windows - é de uma vez anterior)
+    info = (paralelo_ollama_log(str(log), log.stat().st_mtime)
+            if ollama_do_painel() and log.exists() else {})
+    no_servidor = _P().paralelo_do_ollama()
+    if no_servidor is None:
+        no_servidor = info.get("num_parallel")
+    texto = f"Pedidos simultâneos: **{pedido}** no `input.txt` ([ollama] paralelo)"
+    if no_servidor is not None:
+        texto += f" · Ollama iniciado com OLLAMA_NUM_PARALLEL = **{no_servidor}**"
+    if info.get("slots") is not None:
+        texto += f" · modelo carregado com **{info['slots']}** vaga(s)"
+    st.write(texto)
+    if info.get("recusa") and pedido > 1:
+        st.warning(f"A arquitetura do modelo (`{info['recusa']}`) não aceita pedidos simultâneos nesta versão do "
+                   "Ollama: os resumos são lidos um de cada vez, qualquer que seja o `paralelo`. Isso muda só "
+                   "quando uma versão nova do Ollama liberar essa arquitetura (README, seção 17).", icon="⚠️")
+    elif no_servidor is not None and no_servidor < pedido:
+        st.warning(f"O Ollama em execução aceita só {no_servidor} pedido(s) por vez: os outros esperam na fila. "
+                   "Pare o Ollama e inicie de novo por aqui (ele sobe com o valor do `input.txt`).", icon="⚠️")
+    elif info.get("slots") is not None and info["slots"] >= pedido > 1:
+        st.caption(f"✓ {info['slots']} resumos são lidos ao mesmo tempo.")
+    elif no_servidor is None and not info and pedido > 1:
+        st.caption("Este Ollama não foi iniciado pelo painel nem pelo pipeline (serviço do sistema ou ícone "
+                   "da bandeja do Windows): não dá para conferir daqui se ele aceita pedidos simultâneos. "
+                   f"Defina OLLAMA_NUM_PARALLEL = {pedido} nas variáveis de ambiente e reinicie o Ollama "
+                   "(README, seção 17), ou pare-o e inicie por aqui.")
+
+
 def tem_modelo(modelos: list, modelo: str) -> bool:
     return any(m == modelo or m == f"{modelo}:latest" or m.split(":")[0] == modelo for m in modelos or [])
 
@@ -2776,6 +2828,7 @@ def quadro_ollama():
                    + (" · iniciado por este painel" if meu else ""), icon="✅")
         st.write(f"Modelo do `input.txt`: **{cfg['modelo']}** "
                  + ("— baixado ✓" if tem else "— **não baixado**"))
+        quadro_paralelo(cfg)
         if info["carregados"]:
             linhas = []
             for m in info["carregados"]:

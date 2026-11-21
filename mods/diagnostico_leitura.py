@@ -22,7 +22,6 @@ Com --saida PASTA (usado pelo painel, página "Leitura do modelo"), grava tudo
 em CSVs nessa pasta: sequencia.csv, grupos.csv, blocos.csv, pendentes.csv,
 sem_pares.csv e meta.json (este por último: indica que o resto está pronto).
 """
-import collections
 import contextlib
 import io
 import json

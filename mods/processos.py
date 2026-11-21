@@ -208,6 +208,23 @@ def iniciar(args: list[str], log_path: Path, cwd: Path, env_extra: dict | None =
 
 
 # ---- Ollama: pedidos simultâneos --------------------------------------------
+def ollama_bin() -> str | None:
+    """Caminho do executável do Ollama: o do PATH ou, se não estiver no PATH,
+    o local padrão de instalação (Windows: %LOCALAPPDATA%\\Programs\\Ollama)."""
+    import shutil
+    b = shutil.which("ollama")
+    if b:
+        return b
+    for c in ([Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"]
+              if NO_WINDOWS else [Path("/usr/local/bin/ollama"), Path("/usr/bin/ollama"),
+                                  Path.home() / ".local" / "bin" / "ollama",
+                                  Path("/opt/homebrew/bin/ollama"),
+                                  Path("/Applications/Ollama.app/Contents/Resources/ollama")]):
+        if c.is_file():
+            return str(c)
+    return None
+
+
 def env_ollama(paralelo) -> dict:
     """Variáveis para iniciar o `ollama serve`: OLLAMA_NUM_PARALLEL igual ao
     [ollama] paralelo do input.txt, para os pedidos simultâneos do pipeline

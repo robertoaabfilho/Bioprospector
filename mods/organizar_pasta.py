@@ -26,7 +26,6 @@ Recusa-se a rodar com o pipeline, a geração de parciais ou o painel abertos.
 Pode ser rodado de novo: o que já está no lugar fica como está.
 """
 import datetime
-import os
 import shutil
 import subprocess
 import sys

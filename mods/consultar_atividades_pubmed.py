@@ -519,9 +519,15 @@ def preparar_compostos(df: pd.DataFrame, sessao) -> pd.DataFrame:
 # =============================================================================
 # 2-3. Via InChIKey: artigos vinculados no PubChem, filtrados por atividade
 # =============================================================================
-def elink_lote(sessao, cids: list) -> dict | None:
+RESPOSTA_CORTADA = "cortada"   # elink_lote: resposta grande demais, interrompida no meio
+
+
+def elink_lote(sessao, cids: list, avisar: bool = True) -> dict | str | None:
     """{cid: [pmids]} para um lote de CIDs (todos os vínculos PubChem->PubMed:
-    MeSH, depositantes e editoras)."""
+    MeSH, depositantes e editoras). None se o servidor falhou; RESPOSTA_CORTADA
+    se a resposta veio interrompida ou incompleta (lotes com substâncias muito
+    citadas, como o ácido acético, com ~40 mil artigos, passam do que o NCBI
+    entrega de uma vez): aí quem chama divide o lote."""
     dados = [(k, v) for k, v in params_ncbi().items()]
     dados += [("dbfrom", "pccompound"), ("db", "pubmed"), ("retmode", "json")]
     dados += [("id", c) for c in cids]
@@ -529,8 +535,16 @@ def elink_lote(sessao, cids: list) -> dict | None:
         r = sessao.post(EUTILS + "elink.fcgi", data=dados, timeout=120)
         r.raise_for_status()
         conjuntos = r.json().get("linksets", [])
-    except (requests.RequestException, ValueError) as e:
-        print(f"  ! elink falhou ({sem_chave(e)}) - será tentado na próxima execução")
+    except (requests.exceptions.ChunkedEncodingError, requests.exceptions.ContentDecodingError,
+            ValueError) as e:
+        if len(cids) > 1:
+            return RESPOSTA_CORTADA
+        if avisar:
+            print(f"  ! elink falhou para o CID {cids[0]} ({sem_chave(e)}) - será tentado na próxima execução")
+        return None
+    except requests.RequestException as e:
+        if avisar:
+            print(f"  ! elink falhou ({sem_chave(e)}) - será tentado na próxima execução")
         return None
     finally:
         time.sleep(PAUSA_NCBI)
@@ -551,16 +565,31 @@ def vinculos_pubchem(sessao, cids: list) -> dict:
           f"({len(cids) - len(pendentes)} em cache)")
     lotes = [pendentes[i:i + LOTE_ELINK] for i in range(0, len(pendentes), LOTE_ELINK)]
     disjuntor = Disjuntor("PubChem vínculos")
+    divididos = 0
     for lote in tqdm(lotes, desc="PubChem vínculos"):
-        res = elink_lote(sessao, lote)
-        if res is None:
-            if disjuntor.falha():
-                break
-            continue
-        disjuntor.sucesso()
-        for cid in lote:
-            cache[cid] = {"cid": cid, "pmids": res.get(cid, [])}
-            gravar_cache(CACHE_VINCULOS, cache[cid])
+        fila, parar = [lote], False
+        while fila:
+            parte = fila.pop()
+            res = elink_lote(sessao, parte)
+            if res == RESPOSTA_CORTADA:   # resposta grande demais: tenta as duas metades
+                meio = len(parte) // 2
+                fila += [parte[meio:], parte[:meio]]
+                divididos += 1
+                continue
+            if res is None:
+                if disjuntor.falha():
+                    parar = True
+                    break
+                continue
+            disjuntor.sucesso()
+            for cid in parte:
+                cache[cid] = {"cid": cid, "pmids": res.get(cid, [])}
+                gravar_cache(CACHE_VINCULOS, cache[cid])
+        if parar:
+            break
+    if divididos:
+        print(f"  {divididos} lote(s) com resposta grande demais (substâncias muito citadas) "
+              "foram divididos em consultas menores")
     return {c: cache[c]["pmids"] for c in cids if c in cache}
 
 
@@ -671,16 +700,19 @@ def _iniciar_ollama_local(url: str) -> bool:
     """Se o Ollama local está fora do ar, inicia `ollama serve` com
     OLLAMA_NUM_PARALLEL = [ollama] paralelo (registro em resultados/logs/
     ollama.log; o painel o reconhece pelo ollama.pid). True se ficou no ar."""
-    import shutil
     import processos
-    binario = shutil.which("ollama")
+    binario = processos.ollama_bin()
     if not binario or not re.match(r"https?://(localhost|127\.0\.0\.1)(:\d+)?/?$", url):
         return False
     env = processos.env_ollama(CFG_OLLAMA.get("paralelo"))
-    print(f"Ollama fora do ar: iniciando `ollama serve`"
+    print("Ollama fora do ar: iniciando `ollama serve`"
           + (f" com OLLAMA_NUM_PARALLEL={env['OLLAMA_NUM_PARALLEL']}" if env else "")
           + f" (registro em {_C.LOGS / 'ollama.log'})")
-    proc = processos.iniciar([binario, "serve"], _C.LOGS / "ollama.log", _C.RAIZ, env_extra=env)
+    try:
+        proc = processos.iniciar([binario, "serve"], _C.LOGS / "ollama.log", _C.RAIZ, env_extra=env)
+    except OSError as e:   # ex.: Windows, ollama.log preso por um Ollama antigo que não responde
+        print(f"  ! não foi possível iniciar o Ollama ({e})")
+        return False
     (_C.LOGS / "ollama.pid").write_text(str(proc.pid))
     for _ in range(30):
         time.sleep(1)
